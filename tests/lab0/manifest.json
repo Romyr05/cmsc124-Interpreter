@@ -1,0 +1,5 @@
+{
+  "ext": ".testFile",  
+  "mode": "sidecar",
+  "run_entrypoint": "./run"
+}
