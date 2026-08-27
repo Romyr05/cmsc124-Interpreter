@@ -19,6 +19,6 @@
    ```
 
 4. **Run the tests**
-   ```bash
+   ```bash2
    python3 run_tests.py tests/lab0
    ```
