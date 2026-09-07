@@ -1,0 +1,5 @@
+{
+  "ext": ".rust",
+  "flag": "--tokenize",
+  "mode": "sidecar"
+}
