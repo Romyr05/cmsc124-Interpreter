@@ -119,10 +119,8 @@ impl<'a> Iterator for Tokenizer<'a> {
                 let text = &self.source[start_pos..self.cursor];
                 return Some(Token::WhiteSpace(text));
             } else if
-                // here for all the other token types
-
-                c == '('
-            {
+            // here for all the other token types
+            c == '(' {
                 self.cursor += c.len_utf8();
                 return Some(Token::LeftParen(&self.source[self.cursor - 1..self.cursor]));
             } else if c == ')' {
