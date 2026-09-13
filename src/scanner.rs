@@ -10,8 +10,11 @@ pub enum Token<'a> {
     Plus(&'a str),
     Equal(&'a str),
     Number(&'a str),
-    Identifier(&'a str),
+    Word(&'a str),
     WhiteSpace(&'a str),
+    Identifier(&'a str),
+    // keyword tokens below
+    Button(&'a str)
 }
 
 pub struct Tokenizer<'a> {
@@ -27,6 +30,16 @@ impl<'a> Tokenizer<'a> {
     // helper function to get remaining chars from string
     fn remaining(&self) -> &'a str {
         &self.source[self.cursor..]
+    }
+
+    // words encapsulate either identifiers or actual keywords
+    // handle_words matches the token with existing keywords in a list
+    fn handle_words(word: &'a str) -> Token<'a>{
+        match word {
+            "button" => return Token::Button(word),
+            _ => return Token::Identifier(word),
+        }
+
     }
 }
 
@@ -92,7 +105,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 self.cursor += c.len_utf8();
                 return Some(Token::Equal(&self.source[self.cursor - 1..self.cursor]));
 
-                // for identifiers, we break if we see whitespace or a digit
+                // for words, we break if we see whitespace or a digit
             } else {
                 let mut len = c.len_utf8();
                 let start_pos = self.cursor;
@@ -107,9 +120,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                 }
                 self.cursor += len;
                 let text = &self.source[start_pos..self.cursor];
-                return Some(Token::Identifier(text));
+                return Some(Self::handle_words(text));
             }
         } // errors not implemented yet
         None
     }
 }
+
