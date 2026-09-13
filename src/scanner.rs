@@ -1,7 +1,3 @@
-// hi rom, gincopy ko ang solution ko sa hard exercism problem
-// where i also made a tokenizer, ill try to explain it w comments
-// as best as i can
-
 // enum token with different types, kulang pa ni
 #[derive(Debug)]
 pub enum Token<'a> {
@@ -159,7 +155,9 @@ impl<'a> Iterator for Tokenizer<'a> {
                 return Some(Token::LeftParen(&self.source[self.cursor - 1..self.cursor]));
             } else if c == ')' {
                 self.cursor += c.len_utf8();
-                return Some(Token::RightParen(&self.source[self.cursor - 1..self.cursor]));
+                return Some(Token::RightParen(
+                    &self.source[self.cursor - 1..self.cursor],
+                ));
             } else if c == '+' {
                 self.cursor += c.len_utf8();
                 return Some(Token::Plus(&self.source[self.cursor - 1..self.cursor]));
