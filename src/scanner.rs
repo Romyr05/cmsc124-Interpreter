@@ -14,7 +14,23 @@ pub enum Token<'a> {
     WhiteSpace(&'a str),
     Identifier(&'a str),
     // keyword tokens below
-    Button(&'a str)
+    Button(&'a str),
+    Box(&'a str),
+    Text(&'a str),
+    Image(&'a str),
+    Div(&'a str),
+    Paragraph(&'a str),
+    // attributes
+    ID_name(&'a str),
+    Class_name(&'a str),
+    //styling
+    Style_Align(&'a str),
+    Style_Pad(&'a str),
+    Style_Margin(&'a str),
+    Style_Height(&'a str),
+    Style_Width(&'a str),
+    Style_Color(&'a str),
+    Style_Border(&'a str),
 }
 
 pub struct Tokenizer<'a> {
@@ -34,12 +50,59 @@ impl<'a> Tokenizer<'a> {
 
     // words encapsulate either identifiers or actual keywords
     // handle_words matches the token with existing keywords in a list
-    fn handle_words(word: &'a str) -> Token<'a>{
+    fn handle_words(word: &'a str) -> Token<'a> {
         match word {
-            "button" => return Token::Button(word),
-            _ => return Token::Identifier(word),
+            "button" => {
+                return Token::Button(word);
+            }
+            "box" => {
+                return Token::Box(word);
+            }
+            "text" => {
+                return Token::Text(word);
+            }
+            "image" => {
+                return Token::Image(word);
+            }
+            "div" => {
+                return Token::Div(word);
+            }
+            "par" => {
+                return Token::Paragraph(word);
+            }
+            // attributes
+            "id" => {
+                return Token::ID_name(word);
+            }
+            "class" => {
+                return Token::Class_name(word);
+            }
+            //styling
+            "align" => {
+                return Token::Style_Align(word);
+            }
+            "padding" => {
+                return Token::Style_Pad(word);
+            }
+            "margin" => {
+                return Token::Style_Margin(word);
+            }
+            "height" => {
+                return Token::Style_Height(word);
+            }
+            "width" => {
+                return Token::Style_Width(word);
+            }
+            "color" => {
+                return Token::Style_Color(word);
+            }
+            "border" => {
+                return Token::Style_Border(word);
+            }
+            _ => {
+                return Token::Identifier(word);
+            }
         }
-
     }
 }
 
@@ -87,12 +150,11 @@ impl<'a> Iterator for Tokenizer<'a> {
                 self.cursor += len;
                 let text = &self.source[start_pos..self.cursor];
                 return Some(Token::WhiteSpace(text));
-            } 
-            
-             
-            // here for all the other token types
-            
-            else if c == '(' {
+            } else if
+                // here for all the other token types
+
+                c == '('
+            {
                 self.cursor += c.len_utf8();
                 return Some(Token::LeftParen(&self.source[self.cursor - 1..self.cursor]));
             } else if c == ')' {
@@ -126,4 +188,3 @@ impl<'a> Iterator for Tokenizer<'a> {
         None
     }
 }
-
