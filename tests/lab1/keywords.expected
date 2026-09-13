@@ -1,1 +1,12 @@
-Hello, world!
+Identifier("let")
+WhiteSpace(" ")
+Identifier("x")
+WhiteSpace(" ")
+Equal("=")
+WhiteSpace(" ")
+Number("42")
+WhiteSpace(" ")
+Plus("+")
+WhiteSpace(" ")
+Number("5")
+

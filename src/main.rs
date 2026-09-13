@@ -1,6 +1,7 @@
 mod scanner;
+mod token_app;
 use crate::scanner::Tokenizer;
-use crate::scanner::Token;
+use crate::token_app::Token;
 
 fn main() {
     //test works, ignore the compiler warnings
