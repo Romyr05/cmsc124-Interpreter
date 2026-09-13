@@ -40,32 +40,32 @@ impl<'a> Tokenizer<'a> {
             }
             // attributes
             "id" => {
-                return Token::ID_name(word);
+                return Token::IdName(word);
             }
             "class" => {
-                return Token::Class_name(word);
+                return Token::ClassName(word);
             }
             //styling
             "align" => {
-                return Token::Style_Align(word);
+                return Token::StyleAlign(word);
             }
             "padding" => {
-                return Token::Style_Pad(word);
+                return Token::StylePad(word);
             }
             "margin" => {
-                return Token::Style_Margin(word);
+                return Token::StyleMargin(word);
             }
             "height" => {
-                return Token::Style_Height(word);
+                return Token::StyleHeight(word);
             }
             "width" => {
-                return Token::Style_Width(word);
+                return Token::StyleWidth(word);
             }
             "color" => {
-                return Token::Style_Color(word);
+                return Token::StyleColor(word);
             }
             "border" => {
-                return Token::Style_Border(word);
+                return Token::StyleBorder(word);
             }
             _ => {
                 return Token::Identifier(word);
