@@ -21,54 +21,54 @@ impl<'a> Tokenizer<'a> {
     fn handle_words(word: &'a str) -> Token<'a> {
         match word {
             "button" => {
-                return Token::Button(word);
+                Token::Button(word)
             }
             "box" => {
-                return Token::Box(word);
+                Token::Box(word)
             }
             "text" => {
-                return Token::Text(word);
+                Token::Text(word)
             }
             "image" => {
-                return Token::Image(word);
+                Token::Image(word)
             }
             "div" => {
-                return Token::Div(word);
+                Token::Div(word)
             }
             "par" => {
-                return Token::Paragraph(word);
+                Token::Paragraph(word)
             }
             // attributes
             "id" => {
-                return Token::IdName(word);
+                Token::IdName(word)
             }
             "class" => {
-                return Token::ClassName(word);
+                Token::ClassName(word)
             }
             //styling
             "align" => {
-                return Token::StyleAlign(word);
+                Token::StyleAlign(word)
             }
             "padding" => {
-                return Token::StylePad(word);
+                Token::StylePad(word)
             }
             "margin" => {
-                return Token::StyleMargin(word);
+                Token::StyleMargin(word)
             }
             "height" => {
-                return Token::StyleHeight(word);
+                Token::StyleHeight(word)
             }
             "width" => {
-                return Token::StyleWidth(word);
+                Token::StyleWidth(word)
             }
             "color" => {
-                return Token::StyleColor(word);
+                Token::StyleColor(word)
             }
             "border" => {
-                return Token::StyleBorder(word);
+                Token::StyleBorder(word)
             }
             _ => {
-                return Token::Identifier(word);
+                Token::Identifier(word)
             }
         }
     }
@@ -140,9 +140,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 let mut len = c.len_utf8();
                 let start_pos = self.cursor;
                 for next_c in chars {
-                    if next_c.is_whitespace() {
-                        break;
-                    } else if next_c.is_ascii_digit() {
+                    if next_c.is_whitespace() || next_c.is_ascii_digit() {
                         break;
                     } else {
                         len += next_c.len_utf8();
