@@ -1,37 +1,5 @@
-// hi rom, gincopy ko ang solution ko sa hard exercism problem
-// where i also made a tokenizer, ill try to explain it w comments
-// as best as i can
-
 // enum token with different types, kulang pa ni
-#[derive(Debug)]
-pub enum Token<'a> {
-    LeftParen(&'a str),
-    RightParen(&'a str),
-    Plus(&'a str),
-    Equal(&'a str),
-    Number(&'a str),
-    Word(&'a str),
-    WhiteSpace(&'a str),
-    Identifier(&'a str),
-    // keyword tokens below
-    Button(&'a str),
-    Box(&'a str),
-    Text(&'a str),
-    Image(&'a str),
-    Div(&'a str),
-    Paragraph(&'a str),
-    // attributes
-    ID_name(&'a str),
-    Class_name(&'a str),
-    //styling
-    Style_Align(&'a str),
-    Style_Pad(&'a str),
-    Style_Margin(&'a str),
-    Style_Height(&'a str),
-    Style_Width(&'a str),
-    Style_Color(&'a str),
-    Style_Border(&'a str),
-}
+use crate::token_app::Token;
 
 pub struct Tokenizer<'a> {
     source: &'a str,
@@ -52,56 +20,24 @@ impl<'a> Tokenizer<'a> {
     // handle_words matches the token with existing keywords in a list
     fn handle_words(word: &'a str) -> Token<'a> {
         match word {
-            "button" => {
-                return Token::Button(word);
-            }
-            "box" => {
-                return Token::Box(word);
-            }
-            "text" => {
-                return Token::Text(word);
-            }
-            "image" => {
-                return Token::Image(word);
-            }
-            "div" => {
-                return Token::Div(word);
-            }
-            "par" => {
-                return Token::Paragraph(word);
-            }
+            "button" => Token::Button(word),
+            "box" => Token::Box(word),
+            "text" => Token::Text(word),
+            "image" => Token::Image(word),
+            "div" => Token::Div(word),
+            "par" => Token::Paragraph(word),
             // attributes
-            "id" => {
-                return Token::ID_name(word);
-            }
-            "class" => {
-                return Token::Class_name(word);
-            }
+            "id" => Token::IdName(word),
+            "class" => Token::ClassName(word),
             //styling
-            "align" => {
-                return Token::Style_Align(word);
-            }
-            "padding" => {
-                return Token::Style_Pad(word);
-            }
-            "margin" => {
-                return Token::Style_Margin(word);
-            }
-            "height" => {
-                return Token::Style_Height(word);
-            }
-            "width" => {
-                return Token::Style_Width(word);
-            }
-            "color" => {
-                return Token::Style_Color(word);
-            }
-            "border" => {
-                return Token::Style_Border(word);
-            }
-            _ => {
-                return Token::Identifier(word);
-            }
+            "align" => Token::StyleAlign(word),
+            "padding" => Token::StylePad(word),
+            "margin" => Token::StyleMargin(word),
+            "height" => Token::StyleHeight(word),
+            "width" => Token::StyleWidth(word),
+            "color" => Token::StyleColor(word),
+            "border" => Token::StyleBorder(word),
+            _ => Token::Identifier(word),
         }
     }
 }
@@ -151,15 +87,15 @@ impl<'a> Iterator for Tokenizer<'a> {
                 let text = &self.source[start_pos..self.cursor];
                 return Some(Token::WhiteSpace(text));
             } else if
-                // here for all the other token types
-
-                c == '('
-            {
+            // here for all the other token types
+            c == '(' {
                 self.cursor += c.len_utf8();
                 return Some(Token::LeftParen(&self.source[self.cursor - 1..self.cursor]));
             } else if c == ')' {
                 self.cursor += c.len_utf8();
-                return Some(Token::RightParen(&self.source[self.cursor - 1..self.cursor]));
+                return Some(Token::RightParen(
+                    &self.source[self.cursor - 1..self.cursor],
+                ));
             } else if c == '+' {
                 self.cursor += c.len_utf8();
                 return Some(Token::Plus(&self.source[self.cursor - 1..self.cursor]));
@@ -172,9 +108,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 let mut len = c.len_utf8();
                 let start_pos = self.cursor;
                 for next_c in chars {
-                    if next_c.is_whitespace() {
-                        break;
-                    } else if next_c.is_ascii_digit() {
+                    if next_c.is_whitespace() || next_c.is_ascii_digit() {
                         break;
                     } else {
                         len += next_c.len_utf8();

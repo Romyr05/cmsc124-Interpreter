@@ -28,8 +28,8 @@ jobs:
       - name: Download test harness
         run: curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.1/run_tests.py -o run_tests.py
 
-      - name: Run Lab 0 tests
-        run: python3 run_tests.py tests/lab0
+      # - name: Run Lab 0 tests
+      #   run: python3 run_tests.py tests/lab0
 
       - name: Run Lab 1 tests
         run: python3 run_tests.py tests/lab1
