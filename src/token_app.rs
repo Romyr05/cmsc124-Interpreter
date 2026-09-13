@@ -1,4 +1,6 @@
 #[derive(Debug)]
+#[allow(dead_code)]  //Remove this once we have parser, Warnings happen bcos of fields never read (lifetime) 
+                        // and Words not constructed
 pub enum Token<'a> {
     LeftParen(&'a str),
     RightParen(&'a str),
