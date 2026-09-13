@@ -16,14 +16,14 @@ pub enum Token<'a> {
     Div(&'a str),
     Paragraph(&'a str),
     // attributes
-    ID_name(&'a str),
-    Class_name(&'a str),
+    IdName(&'a str),
+    ClassName(&'a str),
     //styling
-    Style_Align(&'a str),
-    Style_Pad(&'a str),
-    Style_Margin(&'a str),
-    Style_Height(&'a str),
-    Style_Width(&'a str),
-    Style_Color(&'a str),
-    Style_Border(&'a str),
+    StyleAlign(&'a str),
+    StylePad(&'a str),
+    StyleMargin(&'a str),
+    StyleHeight(&'a str),
+    StyleWidth(&'a str),
+    StyleColor(&'a str),
+    StyleBorder(&'a str),
 }
