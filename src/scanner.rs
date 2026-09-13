@@ -20,56 +20,24 @@ impl<'a> Tokenizer<'a> {
     // handle_words matches the token with existing keywords in a list
     fn handle_words(word: &'a str) -> Token<'a> {
         match word {
-            "button" => {
-                Token::Button(word)
-            }
-            "box" => {
-                Token::Box(word)
-            }
-            "text" => {
-                Token::Text(word)
-            }
-            "image" => {
-                Token::Image(word)
-            }
-            "div" => {
-                Token::Div(word)
-            }
-            "par" => {
-                Token::Paragraph(word)
-            }
+            "button" => Token::Button(word),
+            "box" => Token::Box(word),
+            "text" => Token::Text(word),
+            "image" => Token::Image(word),
+            "div" => Token::Div(word),
+            "par" => Token::Paragraph(word),
             // attributes
-            "id" => {
-                Token::IdName(word)
-            }
-            "class" => {
-                Token::ClassName(word)
-            }
+            "id" => Token::IdName(word),
+            "class" => Token::ClassName(word),
             //styling
-            "align" => {
-                Token::StyleAlign(word)
-            }
-            "padding" => {
-                Token::StylePad(word)
-            }
-            "margin" => {
-                Token::StyleMargin(word)
-            }
-            "height" => {
-                Token::StyleHeight(word)
-            }
-            "width" => {
-                Token::StyleWidth(word)
-            }
-            "color" => {
-                Token::StyleColor(word)
-            }
-            "border" => {
-                Token::StyleBorder(word)
-            }
-            _ => {
-                Token::Identifier(word)
-            }
+            "align" => Token::StyleAlign(word),
+            "padding" => Token::StylePad(word),
+            "margin" => Token::StyleMargin(word),
+            "height" => Token::StyleHeight(word),
+            "width" => Token::StyleWidth(word),
+            "color" => Token::StyleColor(word),
+            "border" => Token::StyleBorder(word),
+            _ => Token::Identifier(word),
         }
     }
 }
