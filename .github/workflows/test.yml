@@ -1,13 +1,36 @@
 # .github/workflows/test.yml
+# Flow ( Checkout -> install Rust, rustft and clippy -> cargo fmt and clippy -> build and test) 
 name: lab-tests
 on: [push]
 jobs:
   test:
     runs-on: ubuntu-latest
-    steps:
+    steps:  
       - uses: actions/checkout@v7
-      - run: chmod +x build.sh run
-      - run: ./build.sh
-      - run: curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.1/run_tests.py -o run_tests.py
-      - run: python3 run_tests.py tests/lab0
-      - run: python3 run_tests.py tests/lab1
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check Formatting
+        run: cargo fmt -- --check
+
+      - name: Run Clippy Linter
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+
+      - name: Make scripts executable
+        run: chmod +x build.sh run
+
+      - name: Build
+        run: ./build.sh
+
+      - name: Download test harness
+        run: curl -sSL https://raw.githubusercontent.com/WhiteLicorice/cmsc-124-harness/v1.1/run_tests.py -o run_tests.py
+
+      - name: Run Lab 0 tests
+        run: python3 run_tests.py tests/lab0
+
+      - name: Run Lab 1 tests
+        run: python3 run_tests.py tests/lab1
+      
