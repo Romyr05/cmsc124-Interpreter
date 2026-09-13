@@ -10,7 +10,7 @@ fn main() {
 
     let source = match path {
         Some(path) => fs::read_to_string(&path).expect("could not read input file"),
-        
+
         // For manual purposes (cargo run)
         None => String::from("let x = 42 + 5 button () == aa"),
     };
