@@ -1,3 +1,4 @@
+mod repl;
 mod scanner;
 mod token_app;
 use crate::scanner::Tokenizer;
@@ -11,8 +12,11 @@ fn main() {
     let source = match path {
         Some(path) => fs::read_to_string(&path).expect("could not read input file"),
 
-        // For manual purposes (cargo run)
-        None => String::from("let x = 42 + 5 button () == aa"),
+        // no file argument: drop into the interactive REPL instead of scanning a file
+        None => {
+            repl::run();
+            return;
+        }
     };
 
     let tokenizer = Tokenizer::new(&source);
