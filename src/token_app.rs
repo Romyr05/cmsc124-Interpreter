@@ -7,9 +7,11 @@ pub enum Token<'a> {
     Plus(&'a str),
     Equal(&'a str),
     Number(&'a str),
+    String(&'a str),
     Word(&'a str),
     WhiteSpace(&'a str),
     Identifier(&'a str),
+    Initialize(&'a str),
     // keyword tokens below
     Button(&'a str),
     Box(&'a str),

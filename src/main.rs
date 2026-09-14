@@ -16,8 +16,24 @@ fn main() {
     };
 
     let tokenizer = Tokenizer::new(&source);
-    let tokens: Vec<Token> = tokenizer.collect();
-    for token in tokens {
-        println!("{:?}", token);
+    let mut tokens: Vec<Token> = Vec::new();
+    let mut errors = Vec::new();
+    for result in tokenizer {
+        match result {
+            Ok(token) => tokens.push(token),
+            Err(e) => errors.push(e),
+        }
+    }
+
+    // a rejected file puts nothing on stdout and exits 65; a clean scan prints tokens and exits 0
+    if errors.is_empty() {
+        for token in tokens {
+            println!("{:?}", token);
+        }
+    } else {
+        for e in errors {
+            eprintln!("{}", e);
+        }
+        std::process::exit(65);
     }
 }
