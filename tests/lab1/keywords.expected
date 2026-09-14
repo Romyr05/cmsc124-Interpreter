@@ -1,4 +1,4 @@
-Identifier("let")
+Initialize("let")
 WhiteSpace(" ")
 Identifier("x")
 WhiteSpace(" ")
@@ -9,4 +9,3 @@ WhiteSpace(" ")
 Plus("+")
 WhiteSpace(" ")
 Number("5")
-

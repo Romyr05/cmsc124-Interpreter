@@ -1,4 +1,4 @@
-Identifier("let")
+Initialize("let")
 WhiteSpace(" ")
 Identifier("x")
 WhiteSpace(" ")
