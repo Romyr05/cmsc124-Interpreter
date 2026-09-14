@@ -1,5 +1,5 @@
-use std::io::{self, Write};
 use crate::scanner::Tokenizer;
+use std::io::{self, Write};
 
 pub fn run() {
     let stdin = io::stdin();
