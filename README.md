@@ -12,7 +12,7 @@ A domain-specific-language (DSL) designed for GUI-construction based around comp
 ## Host language and build
 
 - Host language: Rust 1.98.1
-- Version metadata: [file that pins it, e.g. rust-toolchain.toml, go.mod]
+- Version metadata: rust-toolchain.toml
 - Build: `./build.sh`
 - [Anything a fresh clone needs to know.]
 
@@ -41,12 +41,30 @@ Exit codes: 0 [when successful], 65 [when input invalid], 70 [when system error]
 
 ### Keywords
 
+#### Components
+
 | Keyword | function |
 |---|---|
-| card | container component, wraps other components |
+| div | container component, wraps other components |
 | text | text component, programmer can freely adjust font and color |
 | button | button component, can run a pre-defined function |
-| color | color component, can run a pre-determined color scheme
+| box | similar to div but predetermined height and width |
+| image | image component, can contain a filepath to the image |
+
+#### Attributes
+| Keyword | function |
+|---|---|
+| id | id attribute, uniquely identifies a component
+| class | class attribute, identifies common components
+| color | color style attribute, can run a pre-determined color scheme
+| align | align style attribute, can be set to start, center, end
+| padding | padding style attribute, can be set to integer values
+| margin | margin style attribute, can be set to integer values
+| height | height style attribute, can be set to integer values
+| width | width style attribute, can be set to integer values
+| border | border style attribute, can be set to integer values
+
+
 
 
 
@@ -58,6 +76,7 @@ Exit codes: 0 [when successful], 65 [when input invalid], 70 [when system error]
 |---|---|---|---|---|
 | [op] | [arithmetic, comparison, logical, assignment, other] | [unary or binary] | [left, right, none] | [1 = loosest] |
 | = | assignment | binary | none | [1 = loosest] |
+| + | arithmetic | binary | none | [1 = loosest] |
 
 ### Literals
 
@@ -237,4 +256,5 @@ approval of your own work.]
 | Activity | What changed in the language |
 |---|---|
 | Lab 1 | [entry] |
-| Lab 1 | defined valid tokens and operators (ie. Grammars) |
+| 1PR1 | defined valid tokens and operators (ie. Grammars) |
+| 1PR2 | expanded on keywords and allowed tokenizer to detect them |
