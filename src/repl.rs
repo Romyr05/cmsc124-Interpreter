@@ -1,7 +1,5 @@
-// repl.rs
 use std::io::{self, Write};
 use crate::scanner::Tokenizer;
-use crate::token_app::Token;
 
 pub fn run() {
     let stdin = io::stdin();
@@ -19,9 +17,11 @@ pub fn run() {
         }
 
         let tokenizer = Tokenizer::new(&command);
-        let tokens: Vec<Token> = tokenizer.collect();
-        for token in tokens {
-            println!("{:?}", token);
+        for result in tokenizer {
+            match result {
+                Ok(token) => println!("{:?}", token),
+                Err(e) => eprintln!("{}", e),
+            }
         }
     }
 }
