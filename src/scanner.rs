@@ -48,7 +48,7 @@ impl<'a> Tokenizer<'a> {
         self.remaining().chars().next()
     }
 
-    // consume if matched
+    // consume if, uses is for those one character 
     fn consume_if(&mut self, expected_char: char) -> bool {
         // use this to "peek" at the next
         match self.peek() {
@@ -57,6 +57,18 @@ impl<'a> Tokenizer<'a> {
                 true
             }
             _ => false,
+        }
+    }
+
+    //Fn trait -> closure, captures external variables from its enclosing
+    fn consume_while(&mut self, condition: impl Fn(char) -> bool){
+        while let Some(c) = self.peek(){
+            if condition(c){
+                self.cursor+= c.len_utf8();
+            }
+            else{
+                break;
+            }
         }
     }
 
@@ -166,17 +178,9 @@ impl<'a> Iterator for Tokenizer<'a> {
                 
 
                 // words start with a letter or underscore and run until any other char
-            } else if c.is_ascii_alphabetic() || c == '_' {
-                let mut len = c.len_utf8();
+            } else if c.is_ascii_alphanumeric() || c == '_' {
                 let start_pos = self.cursor;
-                for next_c in chars {
-                    if next_c.is_ascii_alphabetic() || next_c == '_' {
-                        len += next_c.len_utf8();
-                    } else {
-                        break;
-                    }
-                }
-                self.cursor += len;
+                self.consume_while(|c| c.is_ascii_alphanumeric() || c == '_');
                 let text = &self.source[start_pos..self.cursor];
                 return Some(Ok(Self::word_token(text)));
 
