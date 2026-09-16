@@ -1,5 +1,5 @@
 // enum token with different types, kulang pa ni
-use crate::token_app::Token;
+use crate::{keywordList::keywords_Lookup, token_app::Token};
 use std::fmt;
 
 // the two malformed-input cases the scanner can report
@@ -28,6 +28,7 @@ pub struct Tokenizer<'a> {
     line: usize,
 }
 
+// Helper functions
 impl<'a> Tokenizer<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
@@ -42,30 +43,10 @@ impl<'a> Tokenizer<'a> {
         &self.source[self.cursor..]
     }
 
-    // words encapsulate either identifiers or actual keywords
-    // handle_words matches the token with existing keywords in a list
-    fn handle_words(word: &'a str) -> Token<'a> {
-        match word {
-            "let" => Token::Initialize(word),
-            "button" => Token::Button(word),
-            "box" => Token::Box(word),
-            "text" => Token::Text(word),
-            "image" => Token::Image(word),
-            "div" => Token::Div(word),
-            "par" => Token::Paragraph(word),
-            // attributes
-            "id" => Token::IdName(word),
-            "class" => Token::ClassName(word),
-            //styling
-            "align" => Token::StyleAlign(word),
-            "padding" => Token::StylePad(word),
-            "margin" => Token::StyleMargin(word),
-            "height" => Token::StyleHeight(word),
-            "width" => Token::StyleWidth(word),
-            "color" => Token::StyleColor(word),
-            "border" => Token::StyleBorder(word),
-            _ => Token::Identifier(word),
-        }
+
+    // Token, if not identifier
+    fn word_token(text: &'a str) -> Token<'a> {
+        keywords_Lookup(text).unwrap_or(Token::Identifier(text))
     }
 }
 
@@ -178,7 +159,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 }
                 self.cursor += len;
                 let text = &self.source[start_pos..self.cursor];
-                return Some(Ok(Self::handle_words(text)));
+                return Some(Ok(Self::word_token(text)));
 
                 // any other char can't begin a lexeme: report it and move on
             } else {
