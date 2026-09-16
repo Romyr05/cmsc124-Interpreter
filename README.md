@@ -45,32 +45,51 @@ Exit codes: 0 [when successful], 65 [when input invalid], 70 [when system error]
 
 | Keyword | function |
 |---|---|
-| div | container component, wraps other components |
-| text | text component, programmer can freely adjust font and color |
-| button | button component, can run a pre-defined function |
-| box | similar to div but predetermined height and width |
-| image | image component, can contain a filepath to the image |
+| `div` | container component, wraps other components |
+| `text` | text component, programmer can freely adjust font and color |
+| `button` | button component, can run a pre-defined function |
+| `box` | similar to div but predetermined height and width |
+| `image` | image component, can contain a filepath to the image |
+| `input` | text entry field |
+| `checkbox` | boolean toggle component |
+| `radio` | single-select option among a group |
+| `slider` | draggable value selector within a range |
+| `dropdown` | collapsible selection list |
+| `icon` | small symbolic graphic |
+| `list` | scrollable collection of items |
+| `grid` | arranges children in rows/columns |
+| `row` | horizontal layout container |
+| `column` | vertical layout container |
+
 
 #### Attributes
 | Keyword | function |
 |---|---|
-| id | id attribute, uniquely identifies a component
-| class | class attribute, identifies common components
-| color | color style attribute, can run a pre-determined color scheme
-| align | align style attribute, can be set to start, center, end
-| padding | padding style attribute, can be set to integer values
-| margin | margin style attribute, can be set to integer values
-| height | height style attribute, can be set to integer values
-| width | width style attribute, can be set to integer values
-| border | border style attribute, can be set to integer values
+| `id` | id attribute, uniquely identifies a component
+| `class` | class attribute, identifies common components
+| `color` | color style attribute, can run a pre-determined color scheme
+| `align` | align style attribute, can be set to start, center, end
+| `padding` | padding style attribute, can be set to integer values
+| `margin` | margin style attribute, can be set to integer values
+| `height` | height style attribute, can be set to integer values
+| `width` | width style attribute, can be set to integer values
+| `border` | border style attribute, can be set to integer values
 
 
-
-
-
+## Events
+ 
+| Keyword | Function |
+|---|---|
+| `on_click` | runs a function when clicked |
+| `on_hover` | runs a function on mouse hover |
+| `on_change` | runs a function when value changes |
+| `on_submit` | runs a function on form submission |
+| `on_focus` | runs a function when component gains focus |
+| `on_blur` | runs a function when component loses focus |
+| `function` | defines a function, followed by {} and runs the code inside |
+| `return` | returns a value of the returned type from the function |
 
 ### Operators
-
 
 | Operator | Category | Operands | Associativity | Precedence |
 |---|---|---|---|---|
@@ -83,10 +102,10 @@ Exit codes: 0 [when successful], 65 [when input invalid], 70 [when system error]
 
 | Kind | Syntax | Produces |
 |---|---|---|
-| [number] | [e.g. 42, 3.14] | [what runtime value] |
-| [string] | [e.g. "hello", escapes supported] | [what runtime value] |
-| [boolean] | [true, false] | [what runtime value] |
-| [nil] | [spelling] | [what runtime value] |
+| number | e.g. `42`, `3.14` | Numeric value (int or float, `Token::Number`) |
+| string | e.g. `"hello"`, escapes supported | Text value (`Token::String`) |
+| boolean | `true`, `false` | Boolean value (`Token::Boolean`) |
+| nil | `null` | Absence-of-value / null reference (`Token::Null`) |
 
 
 ### Identifiers
