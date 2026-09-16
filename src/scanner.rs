@@ -114,44 +114,32 @@ impl<'a> Iterator for Tokenizer<'a> {
             // when it detects a digit, iterate until no more
             // digits and then return the whole number as a token
             if c.is_ascii_digit() {
-                let mut len = c.len_utf8();
                 let start_pos = self.cursor;
-                for next_c in chars {
-                    if next_c.is_ascii_digit() {
-                        len += next_c.len_utf8();
-                    } else {
-                        break;
-                    }
-                }
-                self.cursor += len;
+                self.consume_while(|c| c.is_ascii_digit());
                 let text = &self.source[start_pos..self.cursor];
                 return Some(Ok(Token::Number(text)));
             }
 
                 // string literal: "..." may span lines; error only if EOF hits first
             else if c == '"' {
+                self.cursor += c.len_utf8();
                 let start_line = self.line;
-                let content_start = self.cursor + c.len_utf8();
-                let mut len = c.len_utf8();
-                let mut closed = false;
-                for next_c in chars {
-                    len += next_c.len_utf8();
-                    if next_c == '"' {
-                        closed = true;
-                        break;
+                let content_start = self.cursor;
+
+                while let Some(c) = self.peek() {
+                    if c == '"' {
+                        break;           // found closer; break to continue on the consume below
                     }
-                    if next_c == '\n' {
+                    if c == '\n' {
                         self.line += 1;
                     }
+                    self.cursor += c.len_utf8();
                 }
-                if closed {
-                    let content_end = self.cursor + len - '"'.len_utf8();
-                    self.cursor += len;
-                    let text = &self.source[content_start..content_end];
+
+                if self.consume_if('"') {
+                    let text = &self.source[content_start..self.cursor - 1]; // exclude closing quote
                     return Some(Ok(Token::String(text)));
                 } else {
-                    // consume the rest so scanning ends cleanly
-                    self.cursor += len;
                     return Some(Err(ScanError::UnterminatedString { line: start_line }));
                 }
             } else if
