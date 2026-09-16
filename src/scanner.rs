@@ -43,6 +43,22 @@ impl<'a> Tokenizer<'a> {
         &self.source[self.cursor..]
     }
 
+    // Peeking for the next character
+    fn peek(&self) -> Option<char> {
+        self.remaining().chars().next()
+    }
+
+    // consume if matched
+    fn consumeIf(&mut self, expected_char: char) -> bool {
+        // use this to "peek" at the next
+        match self.peek() {
+            Some(c) if c == expected_char => {
+                self.cursor += c.len_utf8();
+                true
+            }
+            _ => false,
+        }
+    }
 
     // Token, if not identifier
     fn word_token(text: &'a str) -> Token<'a> {
