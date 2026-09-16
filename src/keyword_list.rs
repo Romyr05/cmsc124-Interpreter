@@ -1,7 +1,7 @@
 // (Token enum
 use crate::token_app::Token;
 
-pub fn keywords_Lookup(word: &str) -> Option<Token<'_>> {
+pub fn keywords_lookup(word: &str) -> Option<Token<'_>> {
     match word {
         "let" => Some(Token::Initialize(word)),
         "button" => Some(Token::Button(word)),

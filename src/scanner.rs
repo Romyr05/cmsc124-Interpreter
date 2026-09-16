@@ -1,5 +1,5 @@
 // enum token with different types, kulang pa ni
-use crate::{keywordList::keywords_Lookup, token_app::Token};
+use crate::{keyword_list::keywords_lookup, token_app::Token};
 use std::fmt;
 
 // the two malformed-input cases the scanner can report
@@ -49,7 +49,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     // consume if matched
-    fn consumeIf(&mut self, expected_char: char) -> bool {
+    fn consume_if(&mut self, expected_char: char) -> bool {
         // use this to "peek" at the next
         match self.peek() {
             Some(c) if c == expected_char => {
@@ -62,7 +62,7 @@ impl<'a> Tokenizer<'a> {
 
     // Token, if not identifier
     fn word_token(text: &'a str) -> Token<'a> {
-        keywords_Lookup(text).unwrap_or(Token::Identifier(text))
+        keywords_lookup(text).unwrap_or(Token::Identifier(text))
     }
 }
 
