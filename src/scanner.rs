@@ -48,7 +48,7 @@ impl<'a> Tokenizer<'a> {
         self.remaining().chars().next()
     }
 
-    // consume if, uses is for those one character 
+    // consume if, uses is for those one character
     fn consume_if(&mut self, expected_char: char) -> bool {
         // use this to "peek" at the next
         match self.peek() {
@@ -61,12 +61,11 @@ impl<'a> Tokenizer<'a> {
     }
 
     //Fn trait -> closure, captures external variables from its enclosing
-    fn consume_while(&mut self, condition: impl Fn(char) -> bool){
-        while let Some(c) = self.peek(){
-            if condition(c){
-                self.cursor+= c.len_utf8();
-            }
-            else{
+    fn consume_while(&mut self, condition: impl Fn(char) -> bool) {
+        while let Some(c) = self.peek() {
+            if condition(c) {
+                self.cursor += c.len_utf8();
+            } else {
                 break;
             }
         }
@@ -77,10 +76,9 @@ impl<'a> Tokenizer<'a> {
         keywords_lookup(text).unwrap_or(Token::Identifier(text))
     }
 
-    
     fn skip_whitespace(&mut self) {
-        // peeking until matches 
-        while let Some(c) = self.peek(){
+        // peeking until matches
+        while let Some(c) = self.peek() {
             match c {
                 ' ' | '\r' | '\t' => {
                     self.cursor += c.len_utf8();
@@ -90,7 +88,7 @@ impl<'a> Tokenizer<'a> {
                     self.cursor += c.len_utf8();
                 }
                 // else
-                _ => break
+                _ => break,
             }
         }
     }
@@ -101,7 +99,7 @@ impl<'a> Iterator for Tokenizer<'a> {
     type Item = Result<Token<'a>, ScanError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.skip_whitespace();   // Check if cursor is whitespace
+        self.skip_whitespace(); // Check if cursor is whitespace
         let remaining = self.remaining();
         if remaining.is_empty() {
             return None;
@@ -119,8 +117,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                 let text = &self.source[start_pos..self.cursor];
                 return Some(Ok(Token::Number(text)));
             }
-
-                // string literal: "..." may span lines; error only if EOF hits first
+            // string literal: "..." may span lines; error only if EOF hits first
             else if c == '"' {
                 self.cursor += c.len_utf8();
                 let start_line = self.line;
@@ -128,7 +125,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
                 while let Some(c) = self.peek() {
                     if c == '"' {
-                        break;           // found closer; break to continue on the consume below
+                        break; // found closer; break to continue on the consume below
                     }
                     if c == '\n' {
                         self.line += 1;
@@ -159,11 +156,12 @@ impl<'a> Iterator for Tokenizer<'a> {
                 return Some(Ok(Token::Plus(&self.source[self.cursor - 1..self.cursor])));
             } else if c == '=' {
                 self.cursor += c.len_utf8();
-                if (self.consume_if('=')) {
-                    return Some(Ok(Token::Equality(&self.source[self.cursor - 2..self.cursor])));
+                if self.consume_if('=') {
+                    return Some(Ok(Token::Equality(
+                        &self.source[self.cursor - 2..self.cursor],
+                    )));
                 }
                 return Some(Ok(Token::Equal(&self.source[self.cursor - 1..self.cursor])));
-                
 
                 // words start with a letter or underscore and run until any other char
             } else if c.is_ascii_alphanumeric() || c == '_' {
