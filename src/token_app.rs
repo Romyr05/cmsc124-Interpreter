@@ -9,7 +9,7 @@ pub enum Token<'a> {
     Number(&'a str),
     String(&'a str),
     Word(&'a str),
-    WhiteSpace(&'a str),
+    Equality(&'a str),
     Identifier(&'a str),
     Initialize(&'a str),
     // keyword tokens below

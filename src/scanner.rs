@@ -64,6 +64,24 @@ impl<'a> Tokenizer<'a> {
     fn word_token(text: &'a str) -> Token<'a> {
         keywords_lookup(text).unwrap_or(Token::Identifier(text))
     }
+
+    
+    fn skip_whitespace(&mut self) {
+        // peeking until matches 
+        while let Some(c) = self.peek(){
+            match c {
+                ' ' | '\r' | '\t' => {
+                    self.cursor += c.len_utf8();
+                }
+                '\n' => {
+                    self.line += 1;
+                    self.cursor += c.len_utf8();
+                }
+                // else
+                _ => break
+            }
+        }
+    }
 }
 
 // we impl iterator so that can just run .collect() on the tokenizer to get the tokens
@@ -71,6 +89,7 @@ impl<'a> Iterator for Tokenizer<'a> {
     type Item = Result<Token<'a>, ScanError>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        self.skip_whitespace();   // Check if cursor is whitespace
         let remaining = self.remaining();
         if remaining.is_empty() {
             return None;
@@ -95,30 +114,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                 self.cursor += len;
                 let text = &self.source[start_pos..self.cursor];
                 return Some(Ok(Token::Number(text)));
-
-                // same for whitespace; count newlines so line numbers stay accurate
-            } else if c.is_whitespace() {
-                let mut len = c.len_utf8();
-                let start_pos = self.cursor;
-                if c == '\n' {
-                    self.line += 1;
-                }
-                for next_c in chars {
-                    if next_c.is_whitespace() {
-                        len += next_c.len_utf8();
-                        if next_c == '\n' {
-                            self.line += 1;
-                        }
-                    } else {
-                        break;
-                    }
-                }
-                self.cursor += len;
-                let text = &self.source[start_pos..self.cursor];
-                return Some(Ok(Token::WhiteSpace(text)));
+            }
 
                 // string literal: "..." may span lines; error only if EOF hits first
-            } else if c == '"' {
+            else if c == '"' {
                 let start_line = self.line;
                 let content_start = self.cursor + c.len_utf8();
                 let mut len = c.len_utf8();
@@ -160,7 +159,11 @@ impl<'a> Iterator for Tokenizer<'a> {
                 return Some(Ok(Token::Plus(&self.source[self.cursor - 1..self.cursor])));
             } else if c == '=' {
                 self.cursor += c.len_utf8();
+                if (self.consume_if('=')) {
+                    return Some(Ok(Token::Equality(&self.source[self.cursor - 2..self.cursor])));
+                }
                 return Some(Ok(Token::Equal(&self.source[self.cursor - 1..self.cursor])));
+                
 
                 // words start with a letter or underscore and run until any other char
             } else if c.is_ascii_alphabetic() || c == '_' {
