@@ -6,6 +6,7 @@ pub enum Token<'a> {
     RightParen(&'a str),
     Plus(&'a str),
     Equal(&'a str),
+    Star(&'a str),
     Number(&'a str),
     String(&'a str),
     Word(&'a str),
