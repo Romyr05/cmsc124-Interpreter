@@ -1,7 +1,6 @@
 use std::fmt;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[expect(dead_code)]
 pub enum TokenType {
     LeftParen,
     RightParen,
@@ -10,6 +9,7 @@ pub enum TokenType {
     Star,
     Slash,
     Equal,
+    Equality,
     Number,
     String,
     Word,
@@ -35,7 +35,7 @@ pub enum TokenType {
 }
 
 #[derive(Debug, Clone, Copy)]
-#[expect(dead_code)]
+#[allow(dead_code)]
 pub struct Token<'a> {
     pub token_type: TokenType,
     pub lexeme: &'a str,

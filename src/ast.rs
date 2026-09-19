@@ -1,4 +1,4 @@
-use crate::token::Token;
+use crate::token_types::Token;
 
 #[derive(Debug, Clone)]
 pub enum Value {

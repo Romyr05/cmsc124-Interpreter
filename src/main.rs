@@ -1,8 +1,9 @@
+pub mod keyword_list;
 mod repl;
 mod scanner;
-mod token_app;
+mod token_types;
 use crate::scanner::Tokenizer;
-use crate::token_app::Token;
+use crate::token_types::Token;
 use std::fs;
 
 fn main() {
@@ -40,4 +41,10 @@ fn main() {
         }
         std::process::exit(65);
     }
+
+
+
+
 }
+
+
