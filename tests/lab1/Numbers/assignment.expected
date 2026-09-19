@@ -1,0 +1,6 @@
+Initialize("let")
+Identifier("x")
+Equal("=")
+Number("42")
+Plus("+")
+Number("5")
