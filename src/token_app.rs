@@ -1,34 +1,59 @@
-#[derive(Debug)]
-#[allow(dead_code)] //Remove this once we have parser, Warnings happen bcos of fields never read (lifetime) 
-// and Words not constructed
-pub enum Token<'a> {
-    LeftParen(&'a str),
-    RightParen(&'a str),
-    Plus(&'a str),
-    Equal(&'a str),
-    Star(&'a str),
-    Number(&'a str),
-    String(&'a str),
-    Word(&'a str),
-    WhiteSpace(&'a str),
-    Identifier(&'a str),
-    Initialize(&'a str),
-    // keyword tokens below
-    Button(&'a str),
-    Box(&'a str),
-    Text(&'a str),
-    Image(&'a str),
-    Div(&'a str),
-    Paragraph(&'a str),
-    // attributes
-    IdName(&'a str),
-    ClassName(&'a str),
-    //styling
-    StyleAlign(&'a str),
-    StylePad(&'a str),
-    StyleMargin(&'a str),
-    StyleHeight(&'a str),
-    StyleWidth(&'a str),
-    StyleColor(&'a str),
-    StyleBorder(&'a str),
+use std::fmt;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[expect(dead_code)]
+pub enum TokenType {
+    LeftParen,
+    RightParen,
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    Equal,
+    Number,
+    String,
+    Word,
+    WhiteSpace,
+    Identifier,
+    Initialize,
+    Button,
+    Box,
+    Text,
+    Image,
+    Div,
+    Paragraph,
+    IdName,
+    ClassName,
+    StyleAlign,
+    StylePad,
+    StyleMargin,
+    StyleHeight,
+    StyleWidth,
+    StyleColor,
+    StyleBorder,
+    Eof,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[expect(dead_code)]
+pub struct Token<'a> {
+    pub token_type: TokenType,
+    pub lexeme: &'a str,
+    pub line: usize,
+}
+
+impl<'a> Token<'a> {
+    pub fn new(token_type: TokenType, lexeme: &'a str, line: usize) -> Self {
+        Token {
+            token_type,
+            lexeme,
+            line,
+        }
+    }
+}
+
+impl fmt::Display for Token<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}({:?})", self.token_type, self.lexeme)
+    }
 }
