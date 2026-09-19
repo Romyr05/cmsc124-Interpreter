@@ -1,21 +1,21 @@
-Initialize("let")
-WhiteSpace(" ")
-Identifier("x")
-WhiteSpace(" ")
-Equal("=")
-WhiteSpace(" ")
-Number("42")
-WhiteSpace(" ")
-Plus("+")
-WhiteSpace(" ")
-Number("5")
-WhiteSpace(" ")
-Button("button")
-WhiteSpace(" ")
-LeftParen("(")
-RightParen(")")
-WhiteSpace(" ")
-Equal("=")
-Equal("=")
-WhiteSpace(" ")
-Identifier("aa")
+Token { token_type: Initialize, lexeme: "let", line: 1 }
+Token { token_type: WhiteSpace, lexeme: " ", line: 1 }
+Token { token_type: Identifier, lexeme: "x", line: 1 }
+Token { token_type: WhiteSpace, lexeme: " ", line: 1 }
+Token { token_type: Equal, lexeme: "=", line: 1 }
+Token { token_type: WhiteSpace, lexeme: " ", line: 1 }
+Token { token_type: Number, lexeme: "42", line: 1 }
+Token { token_type: WhiteSpace, lexeme: " ", line: 1 }
+Token { token_type: Plus, lexeme: "+", line: 1 }
+Token { token_type: WhiteSpace, lexeme: " ", line: 1 }
+Token { token_type: Number, lexeme: "5", line: 1 }
+Token { token_type: WhiteSpace, lexeme: " ", line: 1 }
+Token { token_type: Button, lexeme: "button", line: 1 }
+Token { token_type: WhiteSpace, lexeme: " ", line: 1 }
+Token { token_type: LeftParen, lexeme: "(", line: 1 }
+Token { token_type: RightParen, lexeme: ")", line: 1 }
+Token { token_type: WhiteSpace, lexeme: " ", line: 1 }
+Token { token_type: Equal, lexeme: "=", line: 1 }
+Token { token_type: Equal, lexeme: "=", line: 1 }
+Token { token_type: WhiteSpace, lexeme: " ", line: 1 }
+Token { token_type: Identifier, lexeme: "aa", line: 1 }
