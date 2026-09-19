@@ -85,7 +85,7 @@ impl<'a> Tokenizer<'a> {
             } else {
                 break;
             }
-        } 
+        }
     }
 
     // a word is a keyword if it matches the list, otherwise an identifier
