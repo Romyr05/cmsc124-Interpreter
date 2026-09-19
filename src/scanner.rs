@@ -6,6 +6,7 @@ use std::fmt;
 pub enum ScanError {
     UnterminatedString { line: usize },
     UnexpectedChar { line: usize, ch: char },
+    UnterminatedComment { line: usize },
 }
 
 impl fmt::Display for ScanError {
@@ -16,6 +17,9 @@ impl fmt::Display for ScanError {
             }
             ScanError::UnexpectedChar { line, ch } => {
                 write!(f, "[line {}] Error: Unexpected character: {}", line, ch)
+            }
+            ScanError::UnterminatedComment { line } => {
+                write!(f, "[line {}] Error: Unterminated comment", line,)
             }
         }
     }
@@ -48,12 +52,12 @@ impl<'a> Tokenizer<'a> {
         self.remaining().chars().next()
     }
 
-    // consume if, uses is for those one character
+    // consume if, consumes the if expected char after call
     fn consume_if(&mut self, expected_char: char) -> bool {
         // use this to "peek" at the next
         match self.peek() {
             Some(c) if c == expected_char => {
-                self.cursor += c.len_utf8();
+                self.cursor += c.len_utf8(); //Advances past
                 true
             }
             _ => false,
@@ -116,6 +120,43 @@ impl<'a> Iterator for Tokenizer<'a> {
                 self.consume_while(|c| c.is_ascii_digit());
                 let text = &self.source[start_pos..self.cursor];
                 return Some(Ok(Token::Number(text)));
+            }
+            //Comment
+            else if c == '/' {
+                self.cursor += c.len_utf8();
+                //Inline comment
+                if self.consume_if('/') {
+                    self.consume_while(|c| c != '\n');
+                    return self.next(); // skip comment, yield next real token
+                }
+                //Block comment
+                else if self.consume_if('*') {
+                    let starting_line = self.line;
+
+                    // consume until the closing */
+                    while !self.remaining().is_empty() && !self.remaining().starts_with("*/") {
+                        let char = self.peek().unwrap();
+                        if char == '\n' {
+                            // \n is only one char
+                            self.line += 1
+                        }
+                        self.cursor += char.len_utf8();
+                    }
+
+                    if self.remaining().starts_with("*/") {
+                        self.cursor += 2; // consume the closing */
+                        return self.next(); // skip comment, yield next real token
+                    } else {
+                        return Some(Err(ScanError::UnterminatedComment {
+                            line: starting_line,
+                        }));
+                    }
+                }
+                //Lone '/' Error
+                return Some(Err(ScanError::UnexpectedChar {
+                    line: self.line,
+                    ch: '/',
+                }));
             }
             // string literal: "..." may span lines; error only if EOF hits first
             else if c == '"' {
