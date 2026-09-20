@@ -1,3 +1,5 @@
+mod tree_printer;
+
 use crate::token_types::Token;
 use crate::scanner::Tokenizer;
 use crate::ast::{ Expr, Value };
@@ -122,12 +124,11 @@ impl Parser {
             return Expr::Grouping { expression: Box::new(inner) };
         }
     }
+}
 
-    fn parse(src: &'static str) -> Expr {
+pub fn parse(src: &'static str) -> Expr {
         let mut tokens: Vec<Token<'static>> = Tokenizer::new(src).collect();
 
         let mut parser = Parser::new(tokens);
         print_expr(parser.expression());
         }
-    }
-}

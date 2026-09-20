@@ -2,6 +2,7 @@ pub mod keyword_list;
 mod repl;
 mod scanner;
 mod token_types;
+mod parser;
 use crate::scanner::Tokenizer;
 use crate::token_types::Token;
 use std::fs;
