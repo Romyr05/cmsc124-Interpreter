@@ -86,8 +86,15 @@ impl Parser {
 
         if self.consumeOnType(&[TokenType::String]) {
             let token = self.previous();
-            let text = token.lexeme.to_string()
+            let text = token.lexeme.to_string();
             return Expr::Literal { value: Value::Str(text) };
         }
+
+        if self.match_any(&[TokenType::LeftParen]) {
+            let inner = self.expression(); 
+            self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
+            return Ok(Expr::Grouping { expression: Box::new(inner) });
+        }
     }
+
 }
