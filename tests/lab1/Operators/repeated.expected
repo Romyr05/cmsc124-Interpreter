@@ -1,0 +1,11 @@
+Token { token_type: Plus, lexeme: "+", line: 1 }
+Token { token_type: Star, lexeme: "*", line: 1 }
+Token { token_type: Plus, lexeme: "+", line: 1 }
+Token { token_type: Plus, lexeme: "+", line: 1 }
+Token { token_type: Plus, lexeme: "+", line: 1 }
+Token { token_type: Plus, lexeme: "+", line: 1 }
+Token { token_type: Minus, lexeme: "-", line: 1 }
+Token { token_type: Minus, lexeme: "-", line: 1 }
+Token { token_type: Minus, lexeme: "-", line: 1 }
+Token { token_type: Minus, lexeme: "-", line: 1 }
+Token { token_type: Eof, lexeme: "", line: 1 }
