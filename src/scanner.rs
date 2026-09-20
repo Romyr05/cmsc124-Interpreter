@@ -103,6 +103,7 @@ impl<'a> Tokenizer<'a> {
             '-' => Some(TokenType::Minus),
             '*' => Some(TokenType::Star),
             '/' => Some(TokenType::Slash),
+            '.' => Some(TokenType::Dot),
             _ => None,
         }
     }
@@ -121,9 +122,19 @@ impl<'a> Iterator for Tokenizer<'a> {
             let line = self.line; // the line this token STARTS on
             let start = self.cursor;
 
-            // Checkers
+            // Numbers
             if c.is_ascii_digit() {
                 self.consume_while(|c| c.is_ascii_digit());
+
+                //Float
+                let check_dot = self.peek();
+                if check_dot == Some('.') {
+                    self.cursor += c.len_utf8();
+                    self.consume_while(|c| c.is_ascii_digit());
+                    let text = &self.source[start..self.cursor];
+                    return Some(Ok(Token::new(TokenType::Float, text, line)));
+
+                }
                 let text = &self.source[start..self.cursor];
                 return Some(Ok(Token::new(TokenType::Number, text, line)));
             }
