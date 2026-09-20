@@ -125,18 +125,17 @@ impl<'a> Iterator for Tokenizer<'a> {
             // Numbers
             if c.is_ascii_digit() {
                 self.consume_while(|c| c.is_ascii_digit());
+                let mut num_type = TokenType::Number;
 
                 //Float
                 let check_dot = self.peek();
                 if check_dot == Some('.') {
                     self.cursor += c.len_utf8();
                     self.consume_while(|c| c.is_ascii_digit());
-                    let text = &self.source[start..self.cursor];
-                    return Some(Ok(Token::new(TokenType::Float, text, line)));
-
+                    num_type = TokenType::Float;
                 }
                 let text = &self.source[start..self.cursor];
-                return Some(Ok(Token::new(TokenType::Number, text, line)));
+                return Some(Ok(Token::new(num_type, text, line)));
             }
 
             // alphabetic to not get the numbers
@@ -148,12 +147,14 @@ impl<'a> Iterator for Tokenizer<'a> {
             }
 
             // string literal: "..." may span lines; error only if EOF hits first
-            if c == '"' {
+            // Same yung " " and ' ' 
+            if c == '"' || c == '\'' {
+                let quote = c;
                 self.cursor += c.len_utf8(); // consume opening quote
                 let content_start = self.cursor;
                 let mut closed = false;
                 while let Some(ch) = self.peek() {
-                    if ch == '"' {
+                    if ch == quote {
                         closed = true;
                         break;
                     }
