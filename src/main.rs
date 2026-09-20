@@ -30,15 +30,14 @@ fn main() {
         }
     }
 
-    // a rejected file puts nothing on stdout and exits 65; a clean scan prints tokens and exits 0
-    if errors.is_empty() {
-        for token in tokens {
-            println!("{:?}", token);
-        }
-    } else {
-        for e in errors {
-            eprintln!("{}", e);
-        }
+    // For expected, error and exit
+    for token in tokens {
+        println!("{:?}", token);
+    }
+    for e in &errors {
+        eprintln!("{}", e);
+    }
+    if !errors.is_empty() {
         std::process::exit(65);
     }
 }
