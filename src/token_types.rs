@@ -15,7 +15,6 @@ pub enum TokenType {
     Float,
     String,
     Word,
-    WhiteSpace,
     Identifier,
     Initialize,
     Button,
