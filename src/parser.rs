@@ -74,7 +74,33 @@ impl Parser {
 
     //expression
     fn expression(&mut self) -> Expr {
-        self.primary()
+        self.term()
+    }
+
+    fn term(&mut self) -> Expr {
+        let mut node = self.factor();
+
+        while self.consumeOnType(&[TokenType::Minus, TokenType::Plus]) {
+            node = Expr::Binary{
+                left: Box::new(expr),
+                operator: self.previous(),
+                right: Box::new(self.factor())
+            };
+        }
+        expr
+    }
+
+    fn factor(&mut self) -> Expr {
+        let mut node = self.factor();
+
+        while self.consumeOnType(&[TokenType::Star, TokenType::Slash]) {
+            node = Expr::Binary{
+                left: Box::new(expr),
+                operator: self.previous(),
+                right: Box::new(self.primary())
+            };
+        }
+        expr
     }
 
     fn primary(&mut self) -> Expr {
@@ -93,7 +119,7 @@ impl Parser {
         if self.match_any(&[TokenType::LeftParen]) {
             let inner = self.expression(); 
             self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
-            return Ok(Expr::Grouping { expression: Box::new(inner) });
+            return Expr::Grouping { expression: Box::new(inner) };
         }
     }
 
