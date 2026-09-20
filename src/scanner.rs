@@ -1,5 +1,6 @@
 // enum token with different types, kulang pa ni
 use crate::keyword_list::keywords_lookup;
+use crate::token_types::TokenType::Eof;
 use crate::token_types::{Token, TokenType};
 use std::fmt;
 
@@ -31,6 +32,8 @@ pub struct Tokenizer<'a> {
     cursor: usize,
     // 1-based line number, advanced as newlines are consumed, for error reports
     line: usize,
+    // set once the Eof token has been handed out, so the iterator stops afterwards
+    eof_emitted: bool,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -39,6 +42,7 @@ impl<'a> Tokenizer<'a> {
             source,
             cursor: 0,
             line: 1,
+            eof_emitted: false,
         }
     }
 
@@ -118,7 +122,17 @@ impl<'a> Iterator for Tokenizer<'a> {
         loop {
             self.skip_whitespace();
 
-            let c = self.peek()?; // None at end of input
+            // Puts EOF if its last
+            let c = match self.peek() {
+                Some(c) => c,
+                None => {
+                    if self.eof_emitted {
+                        return None;
+                    }
+                    self.eof_emitted = true;
+                    return Some(Ok(Token::new(Eof, "", self.line)));
+                }
+            };
             let line = self.line; // the line this token STARTS on
             let start = self.cursor;
 
