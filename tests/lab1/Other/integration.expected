@@ -1,0 +1,14 @@
+Token { token_type: Initialize, lexeme: "let", line: 1 }
+Token { token_type: Box, lexeme: "box", line: 1 }
+Token { token_type: IdName, lexeme: "id", line: 1 }
+Token { token_type: ClassName, lexeme: "class", line: 1 }
+Token { token_type: Button, lexeme: "button", line: 2 }
+Token { token_type: Text, lexeme: "text", line: 2 }
+Token { token_type: String, lexeme: "Click me", line: 2 }
+Token { token_type: Number, lexeme: "42", line: 2 }
+Token { token_type: Div, lexeme: "div", line: 4 }
+Token { token_type: StyleWidth, lexeme: "width", line: 4 }
+Token { token_type: Number, lexeme: "100", line: 4 }
+Token { token_type: StyleHeight, lexeme: "height", line: 4 }
+Token { token_type: Number, lexeme: "50", line: 4 }
+Token { token_type: Eof, lexeme: "", line: 4 }
