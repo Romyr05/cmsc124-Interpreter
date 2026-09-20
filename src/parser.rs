@@ -1,61 +1,59 @@
-mod tree_printer;
-
-use crate::token_types::Token;
+use crate::ast::{Expr, Value};
 use crate::scanner::Tokenizer;
-use crate::ast::{ Expr, Value };
+use crate::token_types::{Token, TokenType};
+use crate::tree_printer::print_expr;
 
 // Recursive Descent Parser
+//
+// Grammar:
+//   expression -> term
+//   term       -> factor ( ( "-" | "+" ) factor )*
+//   factor     -> primary ( ( "*" | "/" ) primary )*
+//   primary    -> NUMBER
+//
+// test: when receiving 2 + 3 * 4, it should output the tree as (2 + (3 * 4))
 
-// test: when recieving 2 + 3 * 4, it should output the tree inorder (2 + (3 * 4))
-
-let tree = Expr::Binary {
-    left: num(2.0),
-    operator: Token::new(TokenType::Plus, "+", 1),
-    right: Box::new(Expr::Binary {
-        left: num(3.0),
-        operator: Token::new(TokenType::Star, "*", 1),
-        right: num(4.0),
-    }),
-};
-
-pub struct Parser {
+#[expect(dead_code)]
+pub struct Parser<'a> {
     tokens: Vec<Token<'a>>,
-    current: usize
+    current: usize,
 }
 
-impl Parser {
+#[expect(dead_code)]
+impl<'a> Parser<'a> {
     pub fn new(tokens: Vec<Token<'a>>) -> Self {
         Parser { tokens, current: 0 }
     }
 
-    //helper functions
-    fn peek(&self) -> Token<'a>{
-        self.tokens[self.current]
+    // ---------- helper functions ----------
+
+    fn peek(&self) -> &Token<'a> {
+        &self.tokens[self.current]
     }
 
-    fn previous(&self) -> Token<'a> {
-        self.tokens[self.current - 1]
+    fn previous(&self) -> &Token<'a> {
+        &self.tokens[self.current - 1]
     }
 
     fn is_at_end(&self) -> bool {
         self.peek().token_type == TokenType::Eof
     }
 
-    fn advance(&mut self) -> Token<'a> {
-        let token = self.peek();
+    // Advance first, then return the token we just consumed.
+    fn advance(&mut self) -> &Token<'a> {
         if !self.is_at_end() {
             self.current += 1;
         }
-        token
+        self.previous()
     }
 
-    fn isType(&self, token_type: TokenType) -> bool {
+    fn is_type(&self, token_type: TokenType) -> bool {
         !self.is_at_end() && self.peek().token_type == token_type
     }
 
-    fn consumeOnType(&mut self, types: &[TokenType]) -> bool {
+    fn consume_on_type(&mut self, types: &[TokenType]) -> bool {
         for &t in types {
-            if self.check(t) {
+            if self.is_type(t) {
                 self.advance();
                 return true;
             }
@@ -63,72 +61,70 @@ impl Parser {
         false
     }
 
-    fn consume(&mut self, token_type: TokenType, message: &str) -> Result<Token<'a>, ParseError<'a>> {
-        if self.check(token_type) {
-            Ok(self.advance())
-        } else {
-            Err(ParseError {
-                token: self.peek(),
-                message: message.to_string(),
-            })
-        }
-    }
+    // ---------- grammar rules ----------
+    // Every rule returns Expr<'a> so the result borrows from the source
+    // text ('a), NOT from the &mut self borrow.
 
-    //expression
-    fn expression(&mut self) -> Expr {
+    fn expression(&mut self) -> Expr<'a> {
         self.term()
     }
 
-    fn term(&mut self) -> Expr {
+    fn term(&mut self) -> Expr<'a> {
         let mut node = self.factor();
 
-        while self.consumeOnType(&[TokenType::Minus, TokenType::Plus]) {
-            node = Expr::Binary{
-                left: Box::new(expr),
-                operator: self.previous(),
-                right: Box::new(self.factor())
+        while self.consume_on_type(&[TokenType::Minus, TokenType::Plus]) {
+            let operator = *self.previous();
+            let right = self.factor();
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
             };
         }
-        expr
+        node
     }
 
-    fn factor(&mut self) -> Expr {
-        let mut node = self.factor();
+    fn factor(&mut self) -> Expr<'a> {
+        let mut node = self.primary();
 
-        while self.consumeOnType(&[TokenType::Star, TokenType::Slash]) {
-            node = Expr::Binary{
-                left: Box::new(expr),
-                operator: self.previous(),
-                right: Box::new(self.primary())
+        while self.consume_on_type(&[TokenType::Star, TokenType::Slash]) {
+            let operator = *self.previous();
+            let right = self.primary();
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
             };
         }
-        expr
+        node
     }
 
-    fn primary(&mut self) -> Expr {
-        if self.consumeOnType(&[TokenType::Number]){
-            let token = self.previous();
-            let n: f64 = token.lexeme
-            return Expr::Literal { value: Value::Number(n) }
+    fn primary(&mut self) -> Expr<'a> {
+        // TODO: add proper error handling, strings, and parentheses
+        if self.consume_on_type(&[TokenType::Number]) {
+            let n: f64 = self.previous().lexeme.parse().unwrap();
+            return Expr::Literal {
+                value: Value::Number(n),
+            };
         }
-
-        if self.consumeOnType(&[TokenType::String]) {
-            let token = self.previous();
-            let text = token.lexeme.to_string();
-            return Expr::Literal { value: Value::Str(text) };
-        }
-
-        if self.match_any(&[TokenType::LeftParen]) {
-            let inner = self.expression(); 
-            self.consume(TokenType::RightParen, "Expect ')' after expression.")?;
-            return Expr::Grouping { expression: Box::new(inner) };
-        }
+        panic!("Expected expression");
     }
 }
 
-pub fn parse(src: &'static str) -> Expr {
-        let mut tokens: Vec<Token<'static>> = Tokenizer::new(src).collect();
-
-        let mut parser = Parser::new(tokens);
-        print_expr(parser.expression());
+#[expect(dead_code)]
+pub fn parse(src: &str) {
+    let tokenizer = Tokenizer::new(src);
+    let mut tokens: Vec<Token> = Vec::new();
+    let mut errors = Vec::new();
+    for result in tokenizer {
+        match result {
+            Ok(token) => tokens.push(token),
+            Err(e) => errors.push(e),
         }
+    }
+
+    // TODO: report `errors` before parsing
+
+    let mut parser = Parser::new(tokens);
+    print_expr(&parser.expression());
+}

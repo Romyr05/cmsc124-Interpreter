@@ -1,8 +1,10 @@
 pub mod keyword_list;
+mod ast;
+mod tree_printer;
+mod parser;
 mod repl;
 mod scanner;
 mod token_types;
-mod parser;
 use crate::scanner::Tokenizer;
 use crate::token_types::Token;
 use std::fs;
