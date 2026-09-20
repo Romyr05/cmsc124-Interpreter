@@ -123,4 +123,11 @@ impl Parser {
         }
     }
 
+    fn parse(src: &'static str) -> Expr {
+        let mut tokens: Vec<Token<'static>> = Tokenizer::new(src).collect();
+
+        let mut parser = Parser::new(tokens);
+        print_expr(parser.expression());
+        }
+    }
 }
