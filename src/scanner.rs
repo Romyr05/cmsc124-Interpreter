@@ -141,10 +141,11 @@ impl<'a> Iterator for Tokenizer<'a> {
                 self.consume_while(|c| c.is_ascii_digit());
                 let mut num_type = TokenType::Number;
 
-                //Float
-                let check_dot = self.peek();
-                if check_dot == Some('.') {
-                    self.cursor += c.len_utf8();
+                // Float
+                // only when a digit follows the '.'
+                let mut after = self.remaining().chars();
+                if after.next() == Some('.') && after.next().is_some_and(|c| c.is_ascii_digit()) {
+                    self.cursor += '.'.len_utf8();
                     self.consume_while(|c| c.is_ascii_digit());
                     num_type = TokenType::Float;
                 }
