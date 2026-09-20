@@ -133,7 +133,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     return Some(Ok(Token::new(Eof, "", self.line)));
                 }
             };
-            let line = self.line; // the line this token STARTS on
+
             let start = self.cursor;
 
             // Numbers
@@ -182,7 +182,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     self.cursor += c.len_utf8(); // Consumes the last quote
                     return Some(Ok(Token::new(TokenType::String, text, self.line)));
                 } else {
-                    return Some(Err(ScanError::UnterminatedString { line }));
+                    return Some(Err(ScanError::UnterminatedString { line: self.line }));
                 }
             }
 
@@ -193,7 +193,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     // block comment '#* ... *#': may span lines, error if never closed
                     loop {
                         if self.remaining().is_empty() {
-                            return Some(Err(ScanError::UnterminatedComment { line }));
+                            return Some(Err(ScanError::UnterminatedComment { line:self.line }));
                         }
                         if self.remaining().starts_with("*#") {
                             self.cursor += 2; // consume closing '*#'
@@ -233,7 +233,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 
             // any other, report it and continue
             self.cursor += c.len_utf8();
-            return Some(Err(ScanError::UnexpectedChar { line, ch: c }));
+            return Some(Err(ScanError::UnexpectedChar { line: self.line, ch: c }));
         }
     }
 }
