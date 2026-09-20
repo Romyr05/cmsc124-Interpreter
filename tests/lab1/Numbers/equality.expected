@@ -1,8 +1,8 @@
-Initialize("let")
-Identifier("x")
-Equal("=")
-Number("42")
-Plus("+")
-Number("5")
-Equality("==")
-Identifier("aa")
+Token { token_type: Initialize, lexeme: "let", line: 1 }
+Token { token_type: Identifier, lexeme: "x", line: 1 }
+Token { token_type: Equal, lexeme: "=", line: 1 }
+Token { token_type: Number, lexeme: "42", line: 1 }
+Token { token_type: Plus, lexeme: "+", line: 1 }
+Token { token_type: Number, lexeme: "5", line: 1 }
+Token { token_type: Equality, lexeme: "==", line: 1 }
+Token { token_type: Identifier, lexeme: "aa", line: 1 }

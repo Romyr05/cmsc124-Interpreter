@@ -1,26 +1,26 @@
-// (Token enum
-use crate::token_app::Token;
+use crate::token_types::TokenType;
 
-pub fn keywords_lookup(word: &str) -> Option<Token<'_>> {
+// maps a word to its keyword TokenType, or Identifier if it isn't a keyword
+pub fn keywords_lookup(word: &str) -> TokenType {
     match word {
-        "let" => Some(Token::Initialize(word)),
-        "button" => Some(Token::Button(word)),
-        "box" => Some(Token::Box(word)),
-        "text" => Some(Token::Text(word)),
-        "image" => Some(Token::Image(word)),
-        "div" => Some(Token::Div(word)),
-        "par" => Some(Token::Paragraph(word)),
+        "let" => TokenType::Initialize,
+        "button" => TokenType::Button,
+        "box" => TokenType::Box,
+        "text" => TokenType::Text,
+        "image" => TokenType::Image,
+        "div" => TokenType::Div,
+        "par" => TokenType::Paragraph,
         // attributes
-        "id" => Some(Token::IdName(word)),
-        "class" => Some(Token::ClassName(word)),
+        "id" => TokenType::IdName,
+        "class" => TokenType::ClassName,
         //styling
-        "align" => Some(Token::StyleAlign(word)),
-        "padding" => Some(Token::StylePad(word)),
-        "margin" => Some(Token::StyleMargin(word)),
-        "height" => Some(Token::StyleHeight(word)),
-        "width" => Some(Token::StyleWidth(word)),
-        "color" => Some(Token::StyleColor(word)),
-        "border" => Some(Token::StyleBorder(word)),
-        _ => Some(Token::Identifier(word)),
+        "align" => TokenType::StyleAlign,
+        "padding" => TokenType::StylePad,
+        "margin" => TokenType::StyleMargin,
+        "height" => TokenType::StyleHeight,
+        "width" => TokenType::StyleWidth,
+        "color" => TokenType::StyleColor,
+        "border" => TokenType::StyleBorder,
+        _ => TokenType::Identifier,
     }
 }
