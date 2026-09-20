@@ -162,7 +162,7 @@ impl<'a> Iterator for Tokenizer<'a> {
             }
 
             // string literal: "..." may span lines; error only if EOF hits first
-            // Same yung " " and ' ' 
+            // Same yung " " and ' '
             if c == '"' {
                 let quote = c;
                 self.cursor += c.len_utf8(); // consume opening quote
@@ -194,7 +194,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     // block comment '#* ... *#': may span lines, error if never closed
                     loop {
                         if self.remaining().is_empty() {
-                            return Some(Err(ScanError::UnterminatedComment { line:self.line }));
+                            return Some(Err(ScanError::UnterminatedComment { line: self.line }));
                         }
                         if self.remaining().starts_with("*#") {
                             self.cursor += 2; // consume closing '*#'
@@ -234,7 +234,10 @@ impl<'a> Iterator for Tokenizer<'a> {
 
             // any other, report it and continue
             self.cursor += c.len_utf8();
-            return Some(Err(ScanError::UnexpectedChar { line: self.line, ch: c }));
+            return Some(Err(ScanError::UnexpectedChar {
+                line: self.line,
+                ch: c,
+            }));
         }
     }
 }
