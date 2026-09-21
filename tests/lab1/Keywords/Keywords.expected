@@ -1,0 +1,6 @@
+Token { token_type: Initialize, lexeme: "let", line: 1 }
+Token { token_type: Button, lexeme: "button", line: 2 }
+Token { token_type: Box, lexeme: "box", line: 3 }
+Token { token_type: Text, lexeme: "text", line: 3 }
+Token { token_type: Div, lexeme: "div", line: 3 }
+Token { token_type: Eof, lexeme: "", line: 3 }

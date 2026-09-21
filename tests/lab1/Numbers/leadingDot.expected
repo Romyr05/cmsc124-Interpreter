@@ -1,0 +1,3 @@
+Token { token_type: Dot, lexeme: ".", line: 1 }
+Token { token_type: Number, lexeme: "5", line: 1 }
+Token { token_type: Eof, lexeme: "", line: 1 }

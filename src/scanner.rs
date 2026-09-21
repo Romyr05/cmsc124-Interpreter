@@ -1,5 +1,6 @@
 // enum token with different types, kulang pa ni
 use crate::keyword_list::keywords_lookup;
+use crate::token_types::TokenType::Eof;
 use crate::token_types::{Token, TokenType};
 use std::fmt;
 
@@ -31,6 +32,8 @@ pub struct Tokenizer<'a> {
     cursor: usize,
     // 1-based line number, advanced as newlines are consumed, for error reports
     line: usize,
+    // set once the Eof token has been handed out, so the iterator stops afterwards
+    eof_emitted: bool,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -39,6 +42,7 @@ impl<'a> Tokenizer<'a> {
             source,
             cursor: 0,
             line: 1,
+            eof_emitted: false,
         }
     }
 
@@ -103,6 +107,7 @@ impl<'a> Tokenizer<'a> {
             '-' => Some(TokenType::Minus),
             '*' => Some(TokenType::Star),
             '/' => Some(TokenType::Slash),
+            '.' => Some(TokenType::Dot),
             _ => None,
         }
     }
@@ -117,15 +122,35 @@ impl<'a> Iterator for Tokenizer<'a> {
         loop {
             self.skip_whitespace();
 
-            let c = self.peek()?; // None at end of input
-            let line = self.line; // the line this token STARTS on
+            // Puts EOF if its last
+            let c = match self.peek() {
+                Some(c) => c,
+                None => {
+                    if self.eof_emitted {
+                        return None;
+                    }
+                    self.eof_emitted = true;
+                    return Some(Ok(Token::new(Eof, "", self.line)));
+                }
+            };
+
             let start = self.cursor;
 
-            // Checkers
+            // Numbers
             if c.is_ascii_digit() {
                 self.consume_while(|c| c.is_ascii_digit());
+                let mut num_type = TokenType::Number;
+
+                // Float
+                // only when a digit follows the '.'
+                let mut after = self.remaining().chars();
+                if after.next() == Some('.') && after.next().is_some_and(|c| c.is_ascii_digit()) {
+                    self.cursor += '.'.len_utf8();
+                    self.consume_while(|c| c.is_ascii_digit());
+                    num_type = TokenType::Float;
+                }
                 let text = &self.source[start..self.cursor];
-                return Some(Ok(Token::new(TokenType::Number, text, line)));
+                return Some(Ok(Token::new(num_type, text, self.line)));
             }
 
             // alphabetic to not get the numbers
@@ -133,16 +158,18 @@ impl<'a> Iterator for Tokenizer<'a> {
             if c.is_ascii_alphabetic() || c == '_' {
                 self.consume_while(|c| c.is_ascii_alphanumeric() || c == '_');
                 let text = &self.source[start..self.cursor];
-                return Some(Ok(Self::word_token(text, line)));
+                return Some(Ok(Self::word_token(text, self.line)));
             }
 
             // string literal: "..." may span lines; error only if EOF hits first
+            // Same yung " " and ' '
             if c == '"' {
+                let quote = c;
                 self.cursor += c.len_utf8(); // consume opening quote
                 let content_start = self.cursor;
                 let mut closed = false;
                 while let Some(ch) = self.peek() {
-                    if ch == '"' {
+                    if ch == quote {
                         closed = true;
                         break;
                     }
@@ -154,9 +181,9 @@ impl<'a> Iterator for Tokenizer<'a> {
                 if closed {
                     let text = &self.source[content_start..self.cursor];
                     self.cursor += c.len_utf8(); // Consumes the last quote
-                    return Some(Ok(Token::new(TokenType::String, text, line)));
+                    return Some(Ok(Token::new(TokenType::String, text, self.line)));
                 } else {
-                    return Some(Err(ScanError::UnterminatedString { line }));
+                    return Some(Err(ScanError::UnterminatedString { line: self.line }));
                 }
             }
 
@@ -167,7 +194,7 @@ impl<'a> Iterator for Tokenizer<'a> {
                     // block comment '#* ... *#': may span lines, error if never closed
                     loop {
                         if self.remaining().is_empty() {
-                            return Some(Err(ScanError::UnterminatedComment { line }));
+                            return Some(Err(ScanError::UnterminatedComment { line: self.line }));
                         }
                         if self.remaining().starts_with("*#") {
                             self.cursor += 2; // consume closing '*#'
@@ -195,19 +222,22 @@ impl<'a> Iterator for Tokenizer<'a> {
                     TokenType::Equal
                 };
                 let text = &self.source[start..self.cursor];
-                return Some(Ok(Token::new(tt, text, line)));
+                return Some(Ok(Token::new(tt, text, self.line)));
             }
 
             // other single-character tokens: ( ) + - * /
             if let Some(tt) = Self::single_char_type(c) {
                 self.cursor += c.len_utf8();
                 let text = &self.source[start..self.cursor];
-                return Some(Ok(Token::new(tt, text, line)));
+                return Some(Ok(Token::new(tt, text, self.line)));
             }
 
             // any other, report it and continue
             self.cursor += c.len_utf8();
-            return Some(Err(ScanError::UnexpectedChar { line, ch: c }));
+            return Some(Err(ScanError::UnexpectedChar {
+                line: self.line,
+                ch: c,
+            }));
         }
     }
 }
