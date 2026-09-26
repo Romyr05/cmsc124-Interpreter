@@ -180,6 +180,7 @@ impl<'a> Tokenizer<'a> {
                     continue;
                 } else {
                     error.push(ScanError::UnterminatedString { line: self.line });
+                    continue;
                 }
             }
 
