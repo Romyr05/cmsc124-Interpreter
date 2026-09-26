@@ -207,7 +207,6 @@ impl<'a> Tokenizer<'a> {
                 } else {
                     // inline comment: run to end of line, the newline is left for skip_whitespace
                     self.consume_while(|c| c != '\n');
-                    
                 }
                 continue; // comment produces no token; scan the next one
             }
