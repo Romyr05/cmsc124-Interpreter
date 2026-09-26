@@ -16,12 +16,12 @@ pub fn run() {
             break;
         }
 
-        let tokenizer = Tokenizer::new(&command);
-        for result in tokenizer {
-            match result {
-                Ok(token) => println!("{:?}", token),
-                Err(e) => eprintln!("{}", e),
-            }
+        let (tokens, errors) = Tokenizer::new(&command).scan();
+        for token in &tokens {
+            println!("{:?}", token);
+        }
+        for e in &errors {
+            println!("{}", e);
         }
     }
 }

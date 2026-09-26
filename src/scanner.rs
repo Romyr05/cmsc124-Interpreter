@@ -32,8 +32,6 @@ pub struct Tokenizer<'a> {
     cursor: usize,
     // 1-based line number, advanced as newlines are consumed, for error reports
     line: usize,
-    // set once the Eof token has been handed out, so the iterator stops afterwards
-    eof_emitted: bool,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -42,7 +40,6 @@ impl<'a> Tokenizer<'a> {
             source,
             cursor: 0,
             line: 1,
-            eof_emitted: false,
         }
     }
 
@@ -111,26 +108,22 @@ impl<'a> Tokenizer<'a> {
             _ => None,
         }
     }
-}
+    // scans each token and then logic based
+    pub fn scan(mut self) -> (Vec<Token<'a>>, Vec<ScanError>) {
+        //Tokens and Error Vectors
+        let mut tokens = Vec::new();
+        let mut error = Vec::new();
 
-// we impl iterator so that can just run .collect() on the tokenizer to get the tokens
-impl<'a> Iterator for Tokenizer<'a> {
-    type Item = Result<Token<'a>, ScanError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
         // loop so comments (and whitespace) can be skipped and scanning continues
         loop {
             self.skip_whitespace();
 
-            // Puts EOF if its last
             let c = match self.peek() {
                 Some(c) => c,
+                // EOF if no tokens
                 None => {
-                    if self.eof_emitted {
-                        return None;
-                    }
-                    self.eof_emitted = true;
-                    return Some(Ok(Token::new(Eof, "", self.line)));
+                    tokens.push(Token::new(Eof, "", self.line));
+                    break;
                 }
             };
 
@@ -150,7 +143,8 @@ impl<'a> Iterator for Tokenizer<'a> {
                     num_type = TokenType::Float;
                 }
                 let text = &self.source[start..self.cursor];
-                return Some(Ok(Token::new(num_type, text, self.line)));
+                tokens.push(Token::new(num_type, text, self.line));
+                continue;
             }
 
             // alphabetic to not get the numbers
@@ -158,11 +152,12 @@ impl<'a> Iterator for Tokenizer<'a> {
             if c.is_ascii_alphabetic() || c == '_' {
                 self.consume_while(|c| c.is_ascii_alphanumeric() || c == '_');
                 let text = &self.source[start..self.cursor];
-                return Some(Ok(Self::word_token(text, self.line)));
+                tokens.push(Self::word_token(text, self.line));
+                continue;
             }
 
             // string literal: "..." may span lines; error only if EOF hits first
-            // Same yung " " and ' '
+            // Same yung " "
             if c == '"' {
                 let quote = c;
                 self.cursor += c.len_utf8(); // consume opening quote
@@ -181,9 +176,10 @@ impl<'a> Iterator for Tokenizer<'a> {
                 if closed {
                     let text = &self.source[content_start..self.cursor];
                     self.cursor += c.len_utf8(); // Consumes the last quote
-                    return Some(Ok(Token::new(TokenType::String, text, self.line)));
+                    tokens.push(Token::new(TokenType::String, text, self.line));
+                    continue;
                 } else {
-                    return Some(Err(ScanError::UnterminatedString { line: self.line }));
+                    error.push(ScanError::UnterminatedString { line: self.line });
                 }
             }
 
@@ -194,7 +190,8 @@ impl<'a> Iterator for Tokenizer<'a> {
                     // block comment '#* ... *#': may span lines, error if never closed
                     loop {
                         if self.remaining().is_empty() {
-                            return Some(Err(ScanError::UnterminatedComment { line: self.line }));
+                            error.push(ScanError::UnterminatedComment { line: self.line });
+                            continue;
                         }
                         if self.remaining().starts_with("*#") {
                             self.cursor += 2; // consume closing '*#'
@@ -222,22 +219,25 @@ impl<'a> Iterator for Tokenizer<'a> {
                     TokenType::Equal
                 };
                 let text = &self.source[start..self.cursor];
-                return Some(Ok(Token::new(tt, text, self.line)));
+                tokens.push(Token::new(tt, text, self.line));
+                continue;
             }
 
             // other single-character tokens: ( ) + - * /
             if let Some(tt) = Self::single_char_type(c) {
                 self.cursor += c.len_utf8();
                 let text = &self.source[start..self.cursor];
-                return Some(Ok(Token::new(tt, text, self.line)));
+                tokens.push(Token::new(tt, text, self.line));
+                continue;
             }
 
             // any other, report it and continue
             self.cursor += c.len_utf8();
-            return Some(Err(ScanError::UnexpectedChar {
+            error.push(ScanError::UnexpectedChar {
                 line: self.line,
                 ch: c,
-            }));
-        }
+            });
+            continue;
+        }(tokens, error)
     }
 }
