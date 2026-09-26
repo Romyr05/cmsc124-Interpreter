@@ -1,3 +1,5 @@
+// refactor after to use the same components as scanner
+
 use crate::ast::{Expr, Value};
 use crate::scanner::Tokenizer;
 use crate::token_types::{Token, TokenType};
@@ -113,14 +115,14 @@ impl<'a> Parser<'a> {
 
 #[expect(dead_code)]
 pub fn parse(src: &str) {
-    let tokenizer = Tokenizer::new(src);
-    let mut tokens: Vec<Token> = Vec::new();
-    let mut errors = Vec::new();
-    for result in tokenizer {
-        match result {
-            Ok(token) => tokens.push(token),
-            Err(e) => errors.push(e),
-        }
+    let (tokens, errors) = Tokenizer::new(src).scan();
+
+    for token in &tokens {
+        println!("{:?}", token);
+    }
+
+    for error in &errors {
+        println!("{}", error);
     }
 
     // TODO: report `errors` before parsing
