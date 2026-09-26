@@ -1,5 +1,7 @@
 // refactor after to use the same components as scanner
 
+use std::fmt;
+
 use crate::ast::{Expr, Value};
 use crate::scanner::Tokenizer;
 use crate::token_types::{Token, TokenType};
@@ -14,6 +16,24 @@ use crate::tree_printer::print_expr;
 //   primary    -> NUMBER
 //
 // test: when receiving 2 + 3 * 4, it should output the tree as (2 + (3 * 4))
+
+#[derive(Debug)]
+pub struct ParseError<'a> {
+    pub token: Token<'a>,
+    pub message: String,
+}
+
+impl<'a> fmt::Display for ParseError<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.token.token_type == TokenType::Eof {
+            write!(f, "Error at end: {}", self.message)
+        } else {
+            write!(f, "Error at '{}': {}", self.token.lexeme, self.message)
+        }
+    }
+}
+
+impl<'a> std::error::Error for ParseError<'a> {}
 
 #[expect(dead_code)]
 pub struct Parser<'a> {
@@ -67,50 +87,55 @@ impl<'a> Parser<'a> {
     // Every rule returns Expr<'a> so the result borrows from the source
     // text ('a), NOT from the &mut self borrow.
 
-    fn expression(&mut self) -> Expr<'a> {
+    fn expression(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         self.term()
     }
 
-    fn term(&mut self) -> Expr<'a> {
-        let mut node = self.factor();
+    fn term(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.factor()?;
 
         while self.consume_on_type(&[TokenType::Minus, TokenType::Plus]) {
             let operator = *self.previous();
-            let right = self.factor();
+            let right = self.factor()?;
             node = Expr::Binary {
                 left: Box::new(node),
                 operator,
                 right: Box::new(right),
             };
         }
-        node
+        Ok(node)
     }
 
-    fn factor(&mut self) -> Expr<'a> {
-        let mut node = self.primary();
+    fn factor(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.primary()?;
 
         while self.consume_on_type(&[TokenType::Star, TokenType::Slash]) {
             let operator = *self.previous();
-            let right = self.primary();
+            let right = self.primary()?;
             node = Expr::Binary {
                 left: Box::new(node),
                 operator,
                 right: Box::new(right),
             };
         }
-        node
+        Ok(node)
     }
 
-    fn primary(&mut self) -> Expr<'a> {
+    fn primary(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         // TODO: add proper error handling, strings, and parentheses
         if self.consume_on_type(&[TokenType::Number]) {
             let n: f64 = self.previous().lexeme.parse().unwrap();
-            return Expr::Literal {
+            return Ok(Expr::Literal {
                 value: Value::Number(n),
-            };
+            });
         }
-        panic!("Expected expression");
+
+        Err(ParseError {
+            token: *self.peek(),
+            message: "Expected expression".to_string(),
+        })
     }
+
 }
 
 #[expect(dead_code)]
@@ -128,5 +153,8 @@ pub fn parse(src: &str) {
     // TODO: report `errors` before parsing
 
     let mut parser = Parser::new(tokens);
-    print_expr(&parser.expression());
+    match parser.expression() {
+        Ok(expr) => println!("{}", print_expr(&expr)),
+        Err(err) => eprintln!("{}", err),
+    }
 }
