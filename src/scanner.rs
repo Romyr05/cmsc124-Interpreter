@@ -238,6 +238,7 @@ impl<'a> Tokenizer<'a> {
                 ch: c,
             });
             continue;
-        }(tokens, error)
+        }
+        (tokens, error)
     }
 }
