@@ -192,7 +192,7 @@ impl<'a> Tokenizer<'a> {
                     loop {
                         if self.remaining().is_empty() {
                             error.push(ScanError::UnterminatedComment { line: self.line });
-                            continue;
+                            break;
                         }
                         if self.remaining().starts_with("*#") {
                             self.cursor += 2; // consume closing '*#'
@@ -207,6 +207,7 @@ impl<'a> Tokenizer<'a> {
                 } else {
                     // inline comment: run to end of line, the newline is left for skip_whitespace
                     self.consume_while(|c| c != '\n');
+                    
                 }
                 continue; // comment produces no token; scan the next one
             }
