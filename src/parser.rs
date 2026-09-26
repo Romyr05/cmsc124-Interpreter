@@ -126,5 +126,5 @@ pub fn parse(src: &str) {
     // TODO: report `errors` before parsing
 
     let mut parser = Parser::new(tokens);
-    print_expr(&parser.expression());
+    println!("{}", print_expr(&parser.expression()));
 }
