@@ -6,7 +6,6 @@ mod scanner;
 mod token_types;
 mod tree_printer;
 use crate::scanner::Tokenizer;
-use crate::token_types::Token;
 use std::fs;
 
 fn main() {
@@ -23,18 +22,10 @@ fn main() {
         }
     };
 
-    let tokenizer = Tokenizer::new(&source);
-    let mut tokens: Vec<Token> = Vec::new();
-    let mut errors = Vec::new();
-    for result in tokenizer {
-        match result {
-            Ok(token) => tokens.push(token),
-            Err(e) => errors.push(e),
-        }
-    }
+    let (tokens, errors) = Tokenizer::new(&source).scan();
 
     // For expected, error and exit
-    for token in tokens {
+    for token in &tokens {
         println!("{:?}", token);
     }
     for e in &errors {
