@@ -35,13 +35,11 @@ impl<'a> fmt::Display for ParseError<'a> {
 
 impl<'a> std::error::Error for ParseError<'a> {}
 
-#[expect(dead_code)]
 pub struct Parser<'a> {
     tokens: Vec<Token<'a>>,
     current: usize,
 }
 
-#[expect(dead_code)]
 impl<'a> Parser<'a> {
     pub fn new(tokens: Vec<Token<'a>>) -> Self {
         Parser { tokens, current: 0 }
@@ -71,6 +69,20 @@ impl<'a> Parser<'a> {
 
     fn is_type(&self, token_type: TokenType) -> bool {
         !self.is_at_end() && self.peek().token_type == token_type
+    }
+
+    fn expect(
+        &mut self,
+        token_type: TokenType,
+        message: &str,
+    ) -> Result<&Token<'a>, ParseError<'a>> {
+        if self.is_type(token_type) {
+            return Ok(self.advance());
+        }
+        Err(ParseError {
+            token: *self.peek(),
+            message: message.to_string(),
+        })
     }
 
     fn consume_on_type(&mut self, types: &[TokenType]) -> bool {
@@ -130,6 +142,23 @@ impl<'a> Parser<'a> {
             });
         }
 
+        // IMPORTANT: For now, mark identifiers as strings as well.
+        if self.consume_on_type(&[TokenType::String, TokenType::Identifier]) {
+            let raw = self.previous().lexeme;
+            let s = raw.trim_matches('"').to_string();
+            return Ok(Expr::Literal {
+                value: Value::Str(s),
+            });
+        }
+
+        if self.consume_on_type(&[TokenType::LeftParen]) {
+            let inner = self.expression()?;
+            self.expect(TokenType::RightParen, "Expected ')' after expression")?;
+            return Ok(Expr::Grouping {
+                expression: Box::new(inner),
+            });
+        }
+
         Err(ParseError {
             token: *self.peek(),
             message: "Expected expression".to_string(),
@@ -137,7 +166,6 @@ impl<'a> Parser<'a> {
     }
 }
 
-#[expect(dead_code)]
 pub fn parse(src: &str) {
     let (tokens, errors) = Tokenizer::new(src).scan();
 
