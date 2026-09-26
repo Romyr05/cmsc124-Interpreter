@@ -135,7 +135,6 @@ impl<'a> Parser<'a> {
             message: "Expected expression".to_string(),
         })
     }
-
 }
 
 #[expect(dead_code)]
