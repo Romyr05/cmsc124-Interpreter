@@ -1,4 +1,4 @@
-use crate::scanner::Tokenizer;
+use crate::parser::parse;
 use std::io::{self, Write};
 
 pub fn run() {
@@ -16,12 +16,6 @@ pub fn run() {
             break;
         }
 
-        let (tokens, errors) = Tokenizer::new(&command).scan();
-        for token in &tokens {
-            println!("{:?}", token);
-        }
-        for e in &errors {
-            println!("{}", e);
-        }
+        parse(&command);
     }
 }

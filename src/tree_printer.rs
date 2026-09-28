@@ -1,6 +1,5 @@
 use crate::ast::{Expr, Value};
 
-#[expect(dead_code)]
 pub fn print_expr(expr: &Expr<'_>) -> String {
     match expr {
         Expr::Literal { value } => match value {
@@ -19,7 +18,6 @@ pub fn print_expr(expr: &Expr<'_>) -> String {
     }
 }
 
-#[expect(dead_code)]
 fn parenthesize(name: &str, children: &[&Expr<'_>]) -> String {
     let mut out = String::new();
     out.push('(');
