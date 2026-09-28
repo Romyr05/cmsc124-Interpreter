@@ -1,8 +1,26 @@
-// boilerplate components
-let html_start = "<!DOCTYPE html><html lang\"html\">";
-let html_end = "</html>";
-let head_start = "<head>";
-let head_end = "</head>";
-let body_start = "<body>";
-let body_end = "</body>";
+use crate::ast::{Expr};
 
+// boilerplate components
+#[expect(dead_code)]
+const HTML_START: &str = "<!DOCTYPE html><html lang\"html\">";
+const HTML_END: &str = "</html>";
+const HEAD_START: &str = "<head>";
+const HEAD_END: &str = "</head>";
+const BODY_START: &str = "<body>";
+const BODY_END: &str = "</body>";
+
+pub struct CodeGenerator<'a> {
+    ast: Expr<'a>,
+    code: String,
+}
+
+// for now, generate empty html boilerplate
+impl<'a> CodeGenerator<'a> {
+    fn load(&mut self, ast: Expr<'a>) {
+        self.ast = ast;
+    }
+
+    fn generate(&mut self){
+        self.code = format!("{}{}{}{}{}{}", HTML_START, HEAD_START, HEAD_END, BODY_START, BODY_END, HTML_END);
+    }
+}
