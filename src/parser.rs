@@ -2,9 +2,9 @@
 
 use std::fmt;
 
-use crate::ast::{Expr, Value};
+use crate::ast::{ Expr, Value };
 use crate::scanner::Tokenizer;
-use crate::token_types::{Token, TokenType};
+use crate::token_types::{ Token, TokenType };
 use crate::tree_printer::print_expr;
 
 // Recursive Descent Parser
@@ -74,7 +74,7 @@ impl<'a> Parser<'a> {
     fn expect(
         &mut self,
         token_type: TokenType,
-        message: &str,
+        message: &str
     ) -> Result<&Token<'a>, ParseError<'a>> {
         if self.is_type(token_type) {
             return Ok(self.advance());
@@ -181,7 +181,11 @@ pub fn parse(src: &str) {
 
     let mut parser = Parser::new(tokens);
     match parser.expression() {
-        Ok(expr) => println!("{}", print_expr(&expr)),
+        Ok(expr) =>
+            match parser.expect(TokenType::Eof, "Expected end of input") {
+                Ok(_) => println!("{}", print_expr(&expr)),
+                Err(err) => eprintln!("{}", err),
+            }
         Err(err) => eprintln!("{}", err),
     }
 }
