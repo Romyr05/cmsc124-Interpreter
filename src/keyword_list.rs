@@ -28,27 +28,27 @@ pub fn keywords_lookup(word: &str) -> TokenType {
 pub fn is_element_keyword(token_type: TokenType) -> bool {
     matches!(
         token_type,
-        TokenType::Button |
-            TokenType::Box |
-            TokenType::Text |
-            TokenType::Image |
-            TokenType::Div |
-            TokenType::Paragraph
+        TokenType::Button
+            | TokenType::Box
+            | TokenType::Text
+            | TokenType::Image
+            | TokenType::Div
+            | TokenType::Paragraph
     )
 }
 
 pub fn is_attribute_keyword(token_type: TokenType) -> bool {
     matches!(
         token_type,
-        TokenType::IdName |
-            TokenType::ClassName |
-            TokenType::StyleAlign |
-            TokenType::StylePad |
-            TokenType::StyleMargin |
-            TokenType::StyleHeight |
-            TokenType::StyleWidth |
-            TokenType::StyleColor |
-            TokenType::StyleBorder
+        TokenType::IdName
+            | TokenType::ClassName
+            | TokenType::StyleAlign
+            | TokenType::StylePad
+            | TokenType::StyleMargin
+            | TokenType::StyleHeight
+            | TokenType::StyleWidth
+            | TokenType::StyleColor
+            | TokenType::StyleBorder
     )
 }
 

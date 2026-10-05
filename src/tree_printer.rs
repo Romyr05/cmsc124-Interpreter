@@ -1,5 +1,5 @@
 use crate::ast::{Attribute, Element, Expr, Value};
-use crate::keyword_list::{element_name, attribute_name};
+use crate::keyword_list::{attribute_name, element_name};
 use crate::parser::TopLevel;
 
 pub fn print_expr(expr: &Expr<'_>) -> String {
@@ -21,7 +21,11 @@ pub fn print_expr(expr: &Expr<'_>) -> String {
 }
 
 pub fn print_attribute(attr: &Attribute) -> String {
-    format!("({} {})", attribute_name(attr.kind), print_expr(&attr.value))
+    format!(
+        "({} {})",
+        attribute_name(attr.kind),
+        print_expr(&attr.value)
+    )
 }
 
 pub fn print_element(element: &Element) -> String {

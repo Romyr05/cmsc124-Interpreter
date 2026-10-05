@@ -1,10 +1,10 @@
 use std::fmt;
 
-use crate::ast::{ Attribute, Element, Expr, Value };
+use crate::ast::{Attribute, Element, Expr, Value};
+use crate::keyword_list::{is_attribute_keyword, is_element_keyword};
 use crate::scanner::Tokenizer;
-use crate::keyword_list::{ is_element_keyword, is_attribute_keyword };
-use crate::token_types::{ Token, TokenType };
-use crate::tree_printer::{ print_expr, print_element };
+use crate::token_types::{Token, TokenType};
+use crate::tree_printer::{print_element, print_expr};
 
 // Recursive Descent Parser
 //
@@ -79,7 +79,7 @@ impl<'a> Parser<'a> {
     fn expect(
         &mut self,
         token_type: TokenType,
-        message: &str
+        message: &str,
     ) -> Result<&Token<'a>, ParseError<'a>> {
         if self.is_type(token_type) {
             return Ok(self.advance());
@@ -171,7 +171,8 @@ impl<'a> Parser<'a> {
         if !is_element_keyword(kind.token_type) {
             return Err(ParseError {
                 token: kind,
-                message: "Expected an element keyword (button, box, text, image, div, par)".to_string(),
+                message: "Expected an element keyword (button, box, text, image, div, par)"
+                    .to_string(),
             });
         }
         self.advance();
@@ -220,7 +221,8 @@ impl<'a> Parser<'a> {
             return Err(ParseError {
                 token: kind,
                 message: "Expected an attribute name (id, class, align, padding, margin, \
-                          height, width, color, border)".to_string(),
+                          height, width, color, border)"
+                    .to_string(),
             });
         }
         self.advance();

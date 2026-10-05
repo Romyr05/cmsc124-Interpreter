@@ -1,5 +1,5 @@
-use crate::token_types::{Token, TokenType};
 use crate::parser::TopLevel;
+use crate::token_types::{Token, TokenType};
 
 #[derive(Debug, Clone)]
 #[expect(dead_code)]
