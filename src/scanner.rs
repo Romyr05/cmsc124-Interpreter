@@ -105,6 +105,7 @@ impl<'a> Tokenizer<'a> {
             '*' => Some(TokenType::Star),
             '/' => Some(TokenType::Slash),
             '.' => Some(TokenType::Dot),
+            ',' => Some(TokenType::Comma),
             _ => None,
         }
     }
