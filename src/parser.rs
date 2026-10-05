@@ -140,11 +140,11 @@ impl<'a> Parser<'a> {
     }
 
     fn logic_or(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        let mut node = self.comparisons()?;
+        let mut node = self.logic_not()?;
 
         while self.consume_on_type(&[TokenType::LogicOr]) {
             let operator = *self.previous();
-            let right = self.comparisons()?;
+            let right = self.logic_not()?;
             node = Expr::Binary {
                 left: Box::new(node),
                 operator,
@@ -152,6 +152,19 @@ impl<'a> Parser<'a> {
             };
         }
         Ok(node)
+    }
+
+    // not (unary prefix): not not a works
+    fn logic_not(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        if self.consume_on_type(&[TokenType::Not]) {
+            let operator = *self.previous();
+            let right = self.logic_not()?;
+            return Ok(Expr::Unary {
+                operator,
+                right: Box::new(right),
+            });
+        }
+        self.comparisons()
     }
 
     fn comparisons(&mut self) -> Result<Expr<'a>, ParseError<'a>> {

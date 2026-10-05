@@ -5,26 +5,43 @@ mod repl;
 mod scanner;
 mod token_types;
 mod tree_printer;
+
+use crate::parser::{Parser, TopLevel};
 use crate::scanner::Tokenizer;
+use crate::tree_printer::{print_element, print_expr};
 use std::fs;
+use std::process::exit;
 
 fn main() {
-    // iterates and gets the file name
-    let path = std::env::args().skip(1).find(|arg| !arg.starts_with("--"));
+    let args: Vec<String> = std::env::args().collect();
+    // a flag starts with "--"; the path is the first argument that doesn't
+    let flag = args.iter().skip(1).find(|a| a.starts_with("--")).cloned();
+    let path = args.iter().skip(1).find(|a| !a.starts_with("--")).cloned();
 
-    let source = match path {
-        Some(path) => fs::read_to_string(&path).expect("could not read input file"),
-
-        // no file argument: drop into the interactive REPL instead of scanning a file
+    // no file argument: drop into the interactive REPL
+    let path = match path {
+        Some(p) => p,
         None => {
             repl::run();
             return;
         }
     };
 
+    match flag.as_deref() {
+        Some("--parse") => parse_file(&path),
+        Some("--tokenize") | None => tokenize_file(&path),
+        Some(other) => {
+            eprintln!("Unknown flag: {}", other);
+            exit(64);
+        }
+    }
+}
+
+// --tokenize: print the scanned tokens
+fn tokenize_file(path: &str) {
+    let source = fs::read_to_string(path).expect("could not read input file");
     let (tokens, errors) = Tokenizer::new(&source).scan();
 
-    // For expected, error and exit
     for token in &tokens {
         println!("{:?}", token);
     }
@@ -32,6 +49,30 @@ fn main() {
         eprintln!("{}", e);
     }
     if !errors.is_empty() {
-        std::process::exit(65);
+        exit(65);
+    }
+}
+
+// --parse: print the AST tree
+fn parse_file(path: &str) {
+    let source = fs::read_to_string(path).expect("could not read input file");
+    let (tokens, errors) = Tokenizer::new(&source).scan();
+
+    // a scan error means the tokens are unreliable, so stop before parsing
+    for e in &errors {
+        eprintln!("{}", e);
+    }
+    if !errors.is_empty() {
+        exit(65);
+    }
+
+    let mut parser = Parser::new(tokens);
+    match parser.parse_top_level() {
+        Ok(TopLevel::Expr(expr)) => println!("{}", print_expr(&expr)),
+        Ok(TopLevel::Element(element)) => println!("{}", print_element(&element)),
+        Err(err) => {
+            eprintln!("{}", err);
+            exit(65);
+        }
     }
 }
