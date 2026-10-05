@@ -224,6 +224,47 @@ impl<'a> Tokenizer<'a> {
                 continue;
             }
 
+            // '<=' otherwise a single '<'
+            if c == '<' {
+                self.cursor += c.len_utf8();
+                let tt = if self.consume_if('=') {
+                    TokenType::LessEqual
+                } else {
+                    TokenType::Less
+                };
+                let text = &self.source[start..self.cursor];
+                tokens.push(Token::new(tt, text, self.line));
+                continue;
+            }
+
+            // '>=' otherwise a single '>'
+            if c == '>' {
+                self.cursor += c.len_utf8();
+                let tt = if self.consume_if('=') {
+                    TokenType::GreaterEqual
+                } else {
+                    TokenType::Greater
+                };
+                let text = &self.source[start..self.cursor];
+                tokens.push(Token::new(tt, text, self.line));
+                continue;
+            }
+
+            // '!=' not-equal; a lone '!' is not a valid token
+            if c == '!' {
+                self.cursor += c.len_utf8();
+                if self.consume_if('=') {
+                    let text = &self.source[start..self.cursor];
+                    tokens.push(Token::new(TokenType::NotEqual, text, self.line));
+                } else {
+                    error.push(ScanError::UnexpectedChar {
+                        line: self.line,
+                        ch: c,
+                    });
+                }
+                continue;
+            }
+
             // other single-character tokens: ( ) + - * /
             if let Some(tt) = Self::single_char_type(c) {
                 self.cursor += c.len_utf8();
