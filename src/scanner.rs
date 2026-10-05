@@ -100,6 +100,9 @@ impl<'a> Tokenizer<'a> {
         match c {
             '(' => Some(TokenType::LeftParen),
             ')' => Some(TokenType::RightParen),
+            '{' => Some(TokenType::LeftBrace),
+            '}' => Some(TokenType::RightBrace),
+            ',' => Some(TokenType::Comma),
             '+' => Some(TokenType::Plus),
             '-' => Some(TokenType::Minus),
             '*' => Some(TokenType::Star),
