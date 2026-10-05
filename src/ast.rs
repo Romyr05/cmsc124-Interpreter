@@ -1,4 +1,5 @@
-use crate::token_types::Token;
+use crate::token_types::{Token, TokenType};
+use crate::parser::TopLevel;
 
 #[derive(Debug, Clone)]
 #[expect(dead_code)]
@@ -7,6 +8,19 @@ pub enum Value {
     Str(String), // owned, so Value needs no lifetime
     Bool(bool),
     Nil,
+}
+
+#[derive(Debug)]
+pub struct Element<'a> {
+    pub kind: TokenType,
+    pub attributes: Vec<Attribute<'a>>,
+    pub children: Vec<TopLevel<'a>>,
+}
+
+#[derive(Debug)]
+pub struct Attribute<'a> {
+    pub kind: TokenType,
+    pub value: Expr<'a>,
 }
 
 #[derive(Debug, Clone)]
