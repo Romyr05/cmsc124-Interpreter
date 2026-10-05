@@ -14,24 +14,26 @@ use std::process::exit;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-    // a flag starts with "--"; the path is the first argument that doesn't
-    let flag = args.iter().skip(1).find(|a| a.starts_with("--")).cloned();
-    let path = args.iter().skip(1).find(|a| !a.starts_with("--")).cloned();
 
-    // no file argument: drop into the interactive REPL
-    let path = match path {
-        Some(p) => p,
-        None => {
-            repl::run();
-            return;
-        }
-    };
-
-    match flag.as_deref() {
-        Some("--parse") => parse_file(&path),
-        Some("--tokenize") | None => tokenize_file(&path),
+    match args.get(1).map(|s| s.as_str()) {
+        // no command: drop into the interactive REPL
+        None => repl::run(),
+        Some("--parse") => match args.get(2) {
+            Some(path) => parse_file(path),
+            None => {
+                eprintln!("--parse needs a file");
+                exit(64);
+            }
+        },
+        Some("--tokenize") => match args.get(2) {
+            Some(path) => tokenize_file(path),
+            None => {
+                eprintln!("--tokenize needs a file");
+                exit(64);
+            }
+        },
         Some(other) => {
-            eprintln!("Unknown flag: {}", other);
+            eprintln!("Unknown command: {}", other);
             exit(64);
         }
     }
