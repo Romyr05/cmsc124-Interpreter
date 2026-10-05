@@ -107,8 +107,8 @@ impl<'a> Parser<'a> {
     fn expression(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         self.assignment()
     }
-    
-    // = 
+
+    // =
     fn assignment(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         let mut node = self.logic_and()?;
 
@@ -156,7 +156,14 @@ impl<'a> Parser<'a> {
 
     fn comparisons(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         let mut node = self.term()?;
-        while self.consume_on_type(&[TokenType::Equality,TokenType::NotEqual,TokenType::Less,TokenType::LessEqual,TokenType::Greater,TokenType::GreaterEqual]) {
+        while self.consume_on_type(&[
+            TokenType::Equality,
+            TokenType::NotEqual,
+            TokenType::Less,
+            TokenType::LessEqual,
+            TokenType::Greater,
+            TokenType::GreaterEqual,
+        ]) {
             let operator = *self.previous();
             let right = self.term()?;
             node = Expr::Binary {
@@ -201,11 +208,14 @@ impl<'a> Parser<'a> {
     }
 
     //for those --x works
-    fn unary(&mut self) -> Result<Expr<'a>, ParseError<'a>>{
-        if self.consume_on_type(&[TokenType::Minus]){
+    fn unary(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        if self.consume_on_type(&[TokenType::Minus]) {
             let operator = *self.previous();
             let right = self.unary()?;
-            return Ok(Expr::Unary { operator, right: (Box::new(right)) })
+            return Ok(Expr::Unary {
+                operator,
+                right: (Box::new(right)),
+            });
         }
         self.primary()
     }
@@ -213,7 +223,7 @@ impl<'a> Parser<'a> {
     // numbers
     fn primary(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         // TODO: add proper error handling, strings, and parentheses
-        if self.consume_on_type(&[TokenType::Number]) {
+        if self.consume_on_type(&[TokenType::Number, TokenType::Float]) {
             let n: f64 = self.previous().lexeme.parse().unwrap();
             return Ok(Expr::Literal {
                 value: Value::Number(n),
@@ -254,10 +264,12 @@ impl<'a> Parser<'a> {
         }
         self.advance();
 
+        // Gets the element
         self.expect(TokenType::LeftParen, "Expected '(' after element keyword")?;
         let attributes = self.attribute_list()?;
         self.expect(TokenType::RightParen, "Expected ')' after attributes")?;
 
+        // Gets the children
         self.expect(TokenType::LeftBrace, "Expected '{' to start element body")?;
         let mut children = Vec::new();
         while !self.is_type(TokenType::RightBrace) && !self.is_at_end() {
@@ -305,7 +317,7 @@ impl<'a> Parser<'a> {
         self.advance();
 
         self.expect(TokenType::Equal, "Expected '=' after attribute name")?;
-        let value = self.primary()?;
+        let value = self.expression()?; // Chaned to allow calculations for the GUI
 
         Ok(Attribute {
             kind: kind.token_type,
@@ -335,7 +347,6 @@ impl<'a> Parser<'a> {
     }
 }
 
-
 pub fn parse(src: &str) {
     let (tokens, errors) = Tokenizer::new(src).scan();
 
@@ -350,8 +361,9 @@ pub fn parse(src: &str) {
     // TODO: report `errors` before parsing
 
     let mut parser = Parser::new(tokens);
-    match parser.expression() {
-        Ok(expr) => println!("{}", print_expr(&expr)),
+    match parser.parse_top_level() {
+        Ok(TopLevel::Expr(expr)) => println!("{}", print_expr(&expr)),
+        Ok(TopLevel::Element(element)) => println!("{}", print_element(&element)),
         Err(err) => eprintln!("{}", err),
     }
 }
