@@ -22,6 +22,7 @@ pub enum TokenType {
     LogicOr,
     Not,
     Dot,
+    Caret,
     Number,
     Float,
     String,
