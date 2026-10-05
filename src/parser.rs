@@ -217,7 +217,23 @@ impl<'a> Parser<'a> {
                 right: (Box::new(right)),
             });
         }
-        self.primary()
+        self.exponent()
+    }
+
+    // ^ (right-associative: 2^3^2 = 2^(3^2))
+    fn exponent(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let node = self.primary()?;
+
+        if self.consume_on_type(&[TokenType::Caret]) {
+            let operator = *self.previous();
+            let right = self.unary()?;
+            return Ok(Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
+            });
+        }
+        Ok(node)
     }
 
     // numbers
