@@ -100,10 +100,82 @@ impl<'a> Parser<'a> {
         false
     }
 
+    // ---------- grammar rules ----------
+    // Every rule returns Expr<'a> so the result borrows from the source
+    // text ('a), NOT from the &mut self borrow.
+
     fn expression(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        self.term()
+        self.assignment()
     }
 
+    // =
+    fn assignment(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.logic_and()?;
+
+        while self.consume_on_type(&[TokenType::Equal]) {
+            let operator = *self.previous();
+            let right = self.logic_and()?;
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        Ok(node)
+    }
+
+    fn logic_and(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.logic_or()?;
+
+        while self.consume_on_type(&[TokenType::LogicAnd]) {
+            let operator = *self.previous();
+            let right = self.logic_or()?;
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        Ok(node)
+    }
+
+    fn logic_or(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.comparisons()?;
+
+        while self.consume_on_type(&[TokenType::LogicOr]) {
+            let operator = *self.previous();
+            let right = self.comparisons()?;
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        Ok(node)
+    }
+
+    fn comparisons(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.term()?;
+        while self.consume_on_type(&[
+            TokenType::Equality,
+            TokenType::NotEqual,
+            TokenType::Less,
+            TokenType::LessEqual,
+            TokenType::Greater,
+            TokenType::GreaterEqual,
+        ]) {
+            let operator = *self.previous();
+            let right = self.term()?;
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        Ok(node)
+    }
+
+    // - and +
     fn term(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         let mut node = self.factor()?;
 
@@ -119,12 +191,13 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
+    // * and /
     fn factor(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        let mut node = self.primary()?;
+        let mut node = self.unary()?;
 
         while self.consume_on_type(&[TokenType::Star, TokenType::Slash]) {
             let operator = *self.previous();
-            let right = self.primary()?;
+            let right = self.unary()?;
             node = Expr::Binary {
                 left: Box::new(node),
                 operator,
@@ -134,9 +207,23 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
+    //for those --x works
+    fn unary(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        if self.consume_on_type(&[TokenType::Minus]) {
+            let operator = *self.previous();
+            let right = self.unary()?;
+            return Ok(Expr::Unary {
+                operator,
+                right: (Box::new(right)),
+            });
+        }
+        self.primary()
+    }
+
+    // numbers
     fn primary(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         // TODO: add proper error handling, strings, and parentheses
-        if self.consume_on_type(&[TokenType::Number]) {
+        if self.consume_on_type(&[TokenType::Number, TokenType::Float]) {
             let n: f64 = self.previous().lexeme.parse().unwrap();
             return Ok(Expr::Literal {
                 value: Value::Number(n),
@@ -177,10 +264,12 @@ impl<'a> Parser<'a> {
         }
         self.advance();
 
+        // Gets the element
         self.expect(TokenType::LeftParen, "Expected '(' after element keyword")?;
         let attributes = self.attribute_list()?;
         self.expect(TokenType::RightParen, "Expected ')' after attributes")?;
 
+        // Gets the children
         self.expect(TokenType::LeftBrace, "Expected '{' to start element body")?;
         let mut children = Vec::new();
         while !self.is_type(TokenType::RightBrace) && !self.is_at_end() {
@@ -228,7 +317,7 @@ impl<'a> Parser<'a> {
         self.advance();
 
         self.expect(TokenType::Equal, "Expected '=' after attribute name")?;
-        let value = self.primary()?;
+        let value = self.expression()?; // Chaned to allow calculations for the GUI
 
         Ok(Attribute {
             kind: kind.token_type,

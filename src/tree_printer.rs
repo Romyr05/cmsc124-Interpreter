@@ -29,7 +29,7 @@ pub fn print_attribute(attr: &Attribute) -> String {
 }
 
 pub fn print_element(element: &Element) -> String {
-    let mut parts = vec![element_name(element.kind).to_string()];
+    let mut parts = vec![element_name(element.kind).to_string()]; // Easy initialization of rust
 
     for attr in &element.attributes {
         parts.push(print_attribute(attr));

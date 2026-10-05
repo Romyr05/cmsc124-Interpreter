@@ -24,7 +24,6 @@ pub struct Attribute<'a> {
 }
 
 #[derive(Debug, Clone)]
-#[expect(dead_code)]
 pub enum Expr<'a> {
     Literal {
         value: Value,

@@ -10,6 +10,10 @@ pub fn keywords_lookup(word: &str) -> TokenType {
         "image" => TokenType::Image,
         "div" => TokenType::Div,
         "par" => TokenType::Paragraph,
+        // logic operators
+        "and" => TokenType::LogicAnd,
+        "or" => TokenType::LogicOr,
+        "not" => TokenType::Not,
         // attributes
         "id" => TokenType::IdName,
         "class" => TokenType::ClassName,
