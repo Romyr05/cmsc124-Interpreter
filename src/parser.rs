@@ -95,14 +95,92 @@ impl<'a> Parser<'a> {
         false
     }
 
+    // Parsing start (expect the EOF token after end)
+
+    pub fn parse_expr(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let expr = self.expression()?;
+
+        if !self.is_at_end() {
+            return Err(ParseError { token: *self.peek(), message: "Unexpected token after expression".to_string() })
+        }
+
+        Ok(expr)
+    }
+
+
     // ---------- grammar rules ----------
     // Every rule returns Expr<'a> so the result borrows from the source
     // text ('a), NOT from the &mut self borrow.
 
-    fn expression(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        self.term()
+    fn arguments(&mut self) -> Result<Expr<'a>, ParseError<'a>>{
+        argumens = []
     }
 
+    fn expression(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        self.assignment()
+    }
+    
+    // = 
+    fn assignment(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.logic_and()?;
+
+        while self.consume_on_type(&[TokenType::Equal]) {
+            let operator = *self.previous();
+            let right = self.logic_and()?;
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        Ok(node)
+    }
+
+    fn logic_and(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.logic_or()?;
+
+        while self.consume_on_type(&[TokenType::LogicAnd]) {
+            let operator = *self.previous();
+            let right = self.logic_or()?;
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        Ok(node)
+    }
+
+    fn logic_or(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.comparisons()?;
+
+        while self.consume_on_type(&[TokenType::LogicOr]) {
+            let operator = *self.previous();
+            let right = self.comparisons()?;
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        Ok(node)
+    }
+
+    fn comparisons(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.term()?;
+        while self.consume_on_type(&[TokenType::Equality,TokenType::NotEqual,TokenType::Less,TokenType::LessEqual,TokenType::Greater,TokenType::GreaterEqual]) {
+            let operator = *self.previous();
+            let right = self.term()?;
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        Ok(node)
+    }
+
+    // - and +
     fn term(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         let mut node = self.factor()?;
 
@@ -118,12 +196,13 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
+    // * and /
     fn factor(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        let mut node = self.primary()?;
+        let mut node = self.unary()?;
 
         while self.consume_on_type(&[TokenType::Star, TokenType::Slash]) {
             let operator = *self.previous();
-            let right = self.primary()?;
+            let right = self.unary()?;
             node = Expr::Binary {
                 left: Box::new(node),
                 operator,
@@ -133,6 +212,17 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
+    //for those --x works
+    fn unary(&mut self) -> Result<Expr<'a>, ParseError<'a>>{
+        if self.consume_on_type(&[TokenType::Minus]){
+            let operator = *self.previous();
+            let right = self.unary()?;
+            return Ok(Expr::Unary { operator, right: (Box::new(right)) })
+        }
+        self.primary()
+    }
+
+    // numbers
     fn primary(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         // TODO: add proper error handling, strings, and parentheses
         if self.consume_on_type(&[TokenType::Number]) {
@@ -166,6 +256,7 @@ impl<'a> Parser<'a> {
     }
 }
 
+
 pub fn parse(src: &str) {
     let (tokens, errors) = Tokenizer::new(src).scan();
 
@@ -180,7 +271,7 @@ pub fn parse(src: &str) {
     // TODO: report `errors` before parsing
 
     let mut parser = Parser::new(tokens);
-    match parser.expression() {
+    match parser.parse_expr() {
         Ok(expr) => println!("{}", print_expr(&expr)),
         Err(err) => eprintln!("{}", err),
     }
