@@ -1,11 +1,10 @@
-// refactor after to use the same components as scanner
-
 use std::fmt;
 
-use crate::ast::{Expr, Value};
+use crate::ast::{Attribute, Element, Expr, Value};
+use crate::keyword_list::{is_attribute_keyword, is_element_keyword};
 use crate::scanner::Tokenizer;
 use crate::token_types::{Token, TokenType};
-use crate::tree_printer::print_expr;
+use crate::tree_printer::{print_element, print_expr};
 
 // Recursive Descent Parser
 //
@@ -38,6 +37,12 @@ impl<'a> std::error::Error for ParseError<'a> {}
 pub struct Parser<'a> {
     tokens: Vec<Token<'a>>,
     current: usize,
+}
+
+#[derive(Debug)]
+pub enum TopLevel<'a> {
+    Expr(Expr<'a>),
+    Element(Element<'a>),
 }
 
 impl<'a> Parser<'a> {
@@ -95,26 +100,9 @@ impl<'a> Parser<'a> {
         false
     }
 
-    // Parsing start (expect the EOF token after end)
-
-    pub fn parse_expr(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        let expr = self.expression()?;
-
-        if !self.is_at_end() {
-            return Err(ParseError { token: *self.peek(), message: "Unexpected token after expression".to_string() })
-        }
-
-        Ok(expr)
-    }
-
-
     // ---------- grammar rules ----------
     // Every rule returns Expr<'a> so the result borrows from the source
     // text ('a), NOT from the &mut self borrow.
-
-    fn arguments(&mut self) -> Result<Expr<'a>, ParseError<'a>>{
-        argumens = []
-    }
 
     fn expression(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         self.assignment()
@@ -254,6 +242,97 @@ impl<'a> Parser<'a> {
             message: "Expected expression".to_string(),
         })
     }
+
+    fn element(&mut self) -> Result<Element<'a>, ParseError<'a>> {
+        let kind = *self.peek();
+        if !is_element_keyword(kind.token_type) {
+            return Err(ParseError {
+                token: kind,
+                message: "Expected an element keyword (button, box, text, image, div, par)"
+                    .to_string(),
+            });
+        }
+        self.advance();
+
+        self.expect(TokenType::LeftParen, "Expected '(' after element keyword")?;
+        let attributes = self.attribute_list()?;
+        self.expect(TokenType::RightParen, "Expected ')' after attributes")?;
+
+        self.expect(TokenType::LeftBrace, "Expected '{' to start element body")?;
+        let mut children = Vec::new();
+        while !self.is_type(TokenType::RightBrace) && !self.is_at_end() {
+            if is_element_keyword(self.peek().token_type) {
+                children.push(TopLevel::Element(self.element()?));
+            } else {
+                children.push(TopLevel::Expr(self.expression()?));
+            }
+        }
+        self.expect(TokenType::RightBrace, "Expected '}' to close element body")?;
+
+        Ok(Element {
+            kind: kind.token_type,
+            attributes,
+            children,
+        })
+    }
+
+    fn attribute_list(&mut self) -> Result<Vec<Attribute<'a>>, ParseError<'a>> {
+        let mut attributes = Vec::new();
+
+        // Empty parens, e.g. div() { ... }, is valid: no attributes.
+        if self.is_type(TokenType::RightParen) {
+            return Ok(attributes);
+        }
+
+        attributes.push(self.attribute()?);
+        while self.consume_on_type(&[TokenType::Comma]) {
+            attributes.push(self.attribute()?);
+        }
+
+        Ok(attributes)
+    }
+
+    fn attribute(&mut self) -> Result<Attribute<'a>, ParseError<'a>> {
+        let kind = *self.peek();
+        if !is_attribute_keyword(kind.token_type) {
+            return Err(ParseError {
+                token: kind,
+                message: "Expected an attribute name (id, class, align, padding, margin, \
+                          height, width, color, border)"
+                    .to_string(),
+            });
+        }
+        self.advance();
+
+        self.expect(TokenType::Equal, "Expected '=' after attribute name")?;
+        let value = self.primary()?;
+
+        Ok(Attribute {
+            kind: kind.token_type,
+            value,
+        })
+    }
+
+    fn is_at_element_start(&self) -> bool {
+        !self.is_at_end() && is_element_keyword(self.peek().token_type)
+    }
+
+    pub fn parse_top_level(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        let result = if self.is_at_element_start() {
+            TopLevel::Element(self.element()?)
+        } else {
+            TopLevel::Expr(self.expression()?)
+        };
+
+        // Same leftover-input check as before, now shared by both branches.
+        if !self.is_at_end() {
+            return Err(ParseError {
+                token: *self.peek(),
+                message: "Expected end of input".to_string(),
+            });
+        }
+        Ok(result)
+    }
 }
 
 
@@ -271,7 +350,7 @@ pub fn parse(src: &str) {
     // TODO: report `errors` before parsing
 
     let mut parser = Parser::new(tokens);
-    match parser.parse_expr() {
+    match parser.expression() {
         Ok(expr) => println!("{}", print_expr(&expr)),
         Err(err) => eprintln!("{}", err),
     }
