@@ -2,7 +2,7 @@ use crate::parser::TopLevel;
 use crate::token_types::{Token, TokenType};
 
 #[derive(Debug, Clone)]
-#[expect(dead_code)]
+#[allow(dead_code)] // Bool/Nil are part of the value model
 pub enum Value {
     Number(f64),
     Str(String), // owned, so Value needs no lifetime
