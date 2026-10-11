@@ -2,9 +2,7 @@ use std::fmt;
 
 use crate::ast::{Attribute, Element, Expr, Value};
 use crate::keyword_list::{is_attribute_keyword, is_element_keyword};
-use crate::scanner::Tokenizer;
 use crate::token_types::{Token, TokenType};
-use crate::tree_printer::{print_element, print_expr};
 
 // Recursive Descent Parser
 //
@@ -373,26 +371,5 @@ impl<'a> Parser<'a> {
             });
         }
         Ok(result)
-    }
-}
-
-pub fn parse(src: &str) {
-    let (tokens, errors) = Tokenizer::new(src).scan();
-
-    for token in &tokens {
-        println!("{:?}", token);
-    }
-
-    for error in &errors {
-        println!("{}", error);
-    }
-
-    // TODO: report `errors` before parsing
-
-    let mut parser = Parser::new(tokens);
-    match parser.parse_top_level() {
-        Ok(TopLevel::Expr(expr)) => println!("{}", print_expr(&expr)),
-        Ok(TopLevel::Element(element)) => println!("{}", print_element(&element)),
-        Err(err) => eprintln!("{}", err),
     }
 }
