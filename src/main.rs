@@ -71,7 +71,7 @@ fn eval_file(path: &str) {
     let source = fs::read_to_string(path).expect("could not read input file");
     let (tokens, errors) = Tokenizer::new(&source).scan();
 
-    // a scan error is a static error: reject before running anything (exit 65)
+    
     for e in &errors {
         eprintln!("{}", e);
     }
@@ -106,7 +106,7 @@ fn eval_file(path: &str) {
                     exit(70); // started running, then hit a runtime error
                 }
             },
-            // elements aren't evaluated this lab; skip them
+            // TBD need to be evaluated
             Ok(TopLevel::Element(_)) => {}
             Err(err) => {
                 eprintln!("{}", err);
