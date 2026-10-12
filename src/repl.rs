@@ -1,4 +1,6 @@
-use crate::parser::parse;
+use crate::evaluator::{evaluate, stringify};
+use crate::parser::{Parser, TopLevel};
+use crate::scanner::Tokenizer;
 use std::io::{self, Write};
 
 pub fn run() {
@@ -16,6 +18,27 @@ pub fn run() {
             break;
         }
 
-        parse(&command);
+        eval_line(&command);
+    }
+}
+
+// evaluate one line of input and print the value, or an error, then return to the prompt
+fn eval_line(src: &str) {
+    let (tokens, errors) = Tokenizer::new(src).scan();
+    for e in &errors {
+        eprintln!("{}", e);
+    }
+    if !errors.is_empty() {
+        return;
+    }
+
+    let mut parser = Parser::new(tokens);
+    match parser.parse_top_level() {
+        Ok(TopLevel::Expr(expr)) => match evaluate(&expr) {
+            Ok(value) => println!("{}", stringify(&value)),
+            Err(err) => eprintln!("{}", err), // runtime error: report and keep the session alive
+        },
+        Ok(TopLevel::Element(_)) => {}
+        Err(err) => eprintln!("{}", err),
     }
 }
