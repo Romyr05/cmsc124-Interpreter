@@ -71,7 +71,6 @@ fn eval_file(path: &str) {
     let source = fs::read_to_string(path).expect("could not read input file");
     let (tokens, errors) = Tokenizer::new(&source).scan();
 
-    
     for e in &errors {
         eprintln!("{}", e);
     }
