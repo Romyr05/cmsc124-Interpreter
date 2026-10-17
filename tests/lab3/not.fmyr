@@ -1,0 +1,7 @@
+not true     # expect: false
+not false    # expect: true
+not null     # expect: true
+not 0        # expect: false
+not ""       # expect: false
+not not 5    # expect: true
+not 1 + 2    # expect: false

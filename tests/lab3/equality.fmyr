@@ -1,0 +1,9 @@
+1 == 1           # expect: true
+1 == 2           # expect: false
+"a" == "a"       # expect: true
+"a" != "b"       # expect: true
+null == null     # expect: true
+1 == "1"         # expect: false
+true != 1        # expect: true
+null == false    # expect: false
+1 + 1 == 2       # expect: true
