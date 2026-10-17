@@ -45,7 +45,7 @@ fn eval_unary(operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
                 message: "Operand must be a number.".to_string(),
             }),
         },
-        // logical not: any value has a truthiness, so this never errors
+        // logical not -> any value has a truthiness, so this never errors
         TokenType::Not => Ok(Value::Bool(!is_truthy(&right))),
         _ => Err(RuntimeError {
             line: operator.line,
@@ -89,7 +89,7 @@ fn eval_binary(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, Run
             Ok(Value::Number(a.powf(b)))
         }
 
-        // Operands
+        // Comparison operators
         TokenType::Less => {
             let(a,b) = number_operands(operator, &left, &right)?;
             Ok(Value::Bool(a<b))
@@ -108,7 +108,10 @@ fn eval_binary(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, Run
             Ok(Value::Bool(a>=b))
         }
 
-
+        //Equality
+        // any pair of types is allowed but different types are never equal
+        TokenType::Equality => Ok(Value::Bool(left == right)),
+        TokenType::NotEqual => Ok(Value::Bool(left != right)),
 
 
         _ => Err(RuntimeError {
