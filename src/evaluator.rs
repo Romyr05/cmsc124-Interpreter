@@ -45,6 +45,8 @@ fn eval_unary(operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
                 message: "Operand must be a number.".to_string(),
             }),
         },
+        // logical not: any value has a truthiness, so this never errors
+        TokenType::Not => Ok(Value::Bool(!is_truthy(&right))),
         _ => Err(RuntimeError {
             line: operator.line,
             message: "Unknown unary operator.".to_string(),
@@ -71,6 +73,16 @@ fn eval_binary(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, Run
     }
 }
 
+// For bool values
+// only false and null are falsey, everything else (0, "") is truthy
+fn is_truthy(value: &Value) -> bool {
+    match value {
+        Value::Bool(b) => *b,
+        Value::Nil => false,
+        _ => true,
+    }
+}
+
 // shared type check so the "must be numbers" message is written once
 fn number_operands(
     operator: &Token,
@@ -86,12 +98,12 @@ fn number_operands(
     }
 }
 
-// how a value prints: numbers trimmed, strings unquoted, nil as "nil"
+// how a value prints: numbers trimmed, strings unquoted, nil as "null"
 pub fn stringify(value: &Value) -> String {
     match value {
         Value::Number(n) => format!("{}", n), // f64 Display prints 5, not 5.0
         Value::Str(s) => s.clone(),
         Value::Bool(b) => b.to_string(),
-        Value::Nil => "nil".to_string(),
+        Value::Nil => "null".to_string(),
     }
 }
