@@ -264,6 +264,19 @@ impl<'a> Parser<'a> {
                 })
             }
 
+            // the keyword lookup only makes Boolean for "true"/"false"
+            TokenType::Boolean => {
+                let b = self.advance().lexeme == "true";
+                Ok(Expr::Literal {
+                    value: Value::Bool(b),
+                })
+            }
+
+            TokenType::Null => {
+                self.advance();
+                Ok(Expr::Literal { value: Value::Nil })
+            }
+
             // IMPORTANT: For now, mark identifiers as strings as well.
             TokenType::String | TokenType::Identifier => {
                 let raw = self.advance().lexeme;

@@ -8,7 +8,7 @@ pub fn print_expr(expr: &Expr<'_>) -> String {
             Value::Number(n) => format!("{:?}", n), // "2.0", not "2"
             Value::Str(s) => s.clone(),
             Value::Bool(b) => b.to_string(),
-            Value::Nil => "nil".to_string(),
+            Value::Nil => "null".to_string(),
         },
         Expr::Unary { operator, right } => parenthesize(operator.lexeme, &[right.as_ref()]),
         Expr::Binary {

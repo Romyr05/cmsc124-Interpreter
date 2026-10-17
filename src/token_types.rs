@@ -26,6 +26,8 @@ pub enum TokenType {
     Number,
     Float,
     String,
+    Boolean,
+    Null,
     Word,
     Identifier,
     Initialize,
