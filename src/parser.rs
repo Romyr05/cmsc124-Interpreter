@@ -73,7 +73,6 @@ impl<'a> Parser<'a> {
         !self.is_at_end() && self.peek().token_type == token_type
     }
 
-    
     fn expect(
         &mut self,
         token_type: TokenType,

@@ -1,7 +1,7 @@
 use crate::parser::TopLevel;
 use crate::token_types::{Token, TokenType};
 
-#[derive(Debug, Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 #[allow(dead_code)] // Bool/Nil are part of the value model
 pub enum Value {
     Number(f64),

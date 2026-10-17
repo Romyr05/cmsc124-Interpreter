@@ -71,7 +71,7 @@ fn eval_binary(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, Run
                 message: "Operands must be two numbers or two strings.".to_string(),
             }),
         },
-        
+
         TokenType::Minus => {
             let (a, b) = number_operands(operator, &left, &right)?;
             Ok(Value::Number(a - b))
@@ -91,21 +91,21 @@ fn eval_binary(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, Run
 
         // Comparison operators
         TokenType::Less => {
-            let(a,b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Bool(a<b))
+            let (a, b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Bool(a < b))
         }
 
         TokenType::LessEqual => {
-            let(a,b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Bool(a<=b))
+            let (a, b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Bool(a <= b))
         }
         TokenType::Greater => {
-            let(a,b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Bool(a>b))
+            let (a, b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Bool(a > b))
         }
         TokenType::GreaterEqual => {
-            let(a,b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Bool(a>=b))
+            let (a, b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Bool(a >= b))
         }
 
         //Equality
@@ -113,13 +113,10 @@ fn eval_binary(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, Run
         TokenType::Equality => Ok(Value::Bool(left == right)),
         TokenType::NotEqual => Ok(Value::Bool(left != right)),
 
-
         _ => Err(RuntimeError {
             line: operator.line,
             message: "Operator not supported yet.".to_string(),
         }),
-
-
     }
 }
 
