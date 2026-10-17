@@ -58,18 +58,65 @@ fn eval_binary(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, Run
     let left = evaluate(left)?; // left, then right
     let right = evaluate(right)?;
 
-    // all arithmetic operators need two numbers
-    let (a, b) = number_operands(operator, &left, &right)?;
+    // each operator checks the types it needs
     match operator.token_type {
-        TokenType::Plus => Ok(Value::Number(a + b)),
-        TokenType::Minus => Ok(Value::Number(a - b)),
-        TokenType::Star => Ok(Value::Number(a * b)),
-        TokenType::Slash => Ok(Value::Number(a / b)), // a / 0 yields inf (IEEE 754)
-        TokenType::Caret => Ok(Value::Number(a.powf(b))),
+        // + adds two numbers or joins two strings, mixing two types -> error
+        TokenType::Plus => match (&left, &right) {
+            (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
+
+            // Foir the concatenation of both string
+            (Value::Str(a), Value::Str(b)) => Ok(Value::Str(format!("{}{}", a, b))),
+            _ => Err(RuntimeError {
+                line: operator.line,
+                message: "Operands must be two numbers or two strings.".to_string(),
+            }),
+        },
+        
+        TokenType::Minus => {
+            let (a, b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Number(a - b))
+        }
+        TokenType::Star => {
+            let (a, b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Number(a * b))
+        }
+        TokenType::Slash => {
+            let (a, b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Number(a / b)) // a / 0 yields inf (IEEE 754)
+        }
+        TokenType::Caret => {
+            let (a, b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Number(a.powf(b)))
+        }
+
+        // Operands
+        TokenType::Less => {
+            let(a,b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Bool(a<b))
+        }
+
+        TokenType::LessEqual => {
+            let(a,b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Bool(a<=b))
+        }
+        TokenType::Greater => {
+            let(a,b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Bool(a>b))
+        }
+        TokenType::GreaterEqual => {
+            let(a,b) = number_operands(operator, &left, &right)?;
+            Ok(Value::Bool(a>=b))
+        }
+
+
+
+
         _ => Err(RuntimeError {
             line: operator.line,
             message: "Operator not supported yet.".to_string(),
         }),
+
+
     }
 }
 
