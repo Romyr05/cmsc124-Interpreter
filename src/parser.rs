@@ -22,10 +22,9 @@ pub struct ParseError<'a> {
 
 impl<'a> fmt::Display for ParseError<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.token.token_type == TokenType::Eof {
-            write!(f, "Error at end: {}", self.message)
-        } else {
-            write!(f, "Error at '{}': {}", self.token.lexeme, self.message)
+        match self.token.token_type {
+            TokenType::Eof => write!(f, "Error at end: {}", self.message),
+            _ => write!(f, "Error at '{}': {}", self.token.lexeme, self.message),
         }
     }
 }
@@ -74,18 +73,19 @@ impl<'a> Parser<'a> {
         !self.is_at_end() && self.peek().token_type == token_type
     }
 
+    
     fn expect(
         &mut self,
         token_type: TokenType,
         message: &str,
     ) -> Result<&Token<'a>, ParseError<'a>> {
-        if self.is_type(token_type) {
-            return Ok(self.advance());
+        match self.peek().token_type {
+            t if t == token_type && !self.is_at_end() => Ok(self.advance()),
+            _ => Err(ParseError {
+                token: *self.peek(),
+                message: message.to_string(),
+            }),
         }
-        Err(ParseError {
-            token: *self.peek(),
-            message: message.to_string(),
-        })
     }
 
     fn consume_on_type(&mut self, types: &[TokenType]) -> bool {
@@ -154,15 +154,17 @@ impl<'a> Parser<'a> {
 
     // not (unary prefix): not not a works
     fn logic_not(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        if self.consume_on_type(&[TokenType::Not]) {
-            let operator = *self.previous();
-            let right = self.logic_not()?;
-            return Ok(Expr::Unary {
-                operator,
-                right: Box::new(right),
-            });
+        match self.peek().token_type {
+            TokenType::Not => {
+                let operator = *self.advance();
+                let right = self.logic_not()?;
+                Ok(Expr::Unary {
+                    operator,
+                    right: Box::new(right),
+                })
+            }
+            _ => self.comparisons(),
         }
-        self.comparisons()
     }
 
     fn comparisons(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
@@ -220,64 +222,71 @@ impl<'a> Parser<'a> {
 
     //for those --x works
     fn unary(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        if self.consume_on_type(&[TokenType::Minus]) {
-            let operator = *self.previous();
-            let right = self.unary()?;
-            return Ok(Expr::Unary {
-                operator,
-                right: (Box::new(right)),
-            });
+        match self.peek().token_type {
+            TokenType::Minus => {
+                let operator = *self.advance();
+                let right = self.unary()?;
+                Ok(Expr::Unary {
+                    operator,
+                    right: (Box::new(right)),
+                })
+            }
+            _ => self.exponent(),
         }
-        self.exponent()
     }
 
     // ^ (right-associative: 2^3^2 = 2^(3^2))
     fn exponent(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         let node = self.primary()?;
 
-        if self.consume_on_type(&[TokenType::Caret]) {
-            let operator = *self.previous();
-            let right = self.unary()?;
-            return Ok(Expr::Binary {
-                left: Box::new(node),
-                operator,
-                right: Box::new(right),
-            });
+        match self.peek().token_type {
+            TokenType::Caret => {
+                let operator = *self.advance();
+                let right = self.unary()?;
+                Ok(Expr::Binary {
+                    left: Box::new(node),
+                    operator,
+                    right: Box::new(right),
+                })
+            }
+            _ => Ok(node),
         }
-        Ok(node)
     }
 
     // numbers
     fn primary(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         // TODO: add proper error handling, strings, and parentheses
-        if self.consume_on_type(&[TokenType::Number, TokenType::Float]) {
-            let n: f64 = self.previous().lexeme.parse().unwrap();
-            return Ok(Expr::Literal {
-                value: Value::Number(n),
-            });
-        }
+        match self.peek().token_type {
+            TokenType::Number | TokenType::Float => {
+                let n: f64 = self.advance().lexeme.parse().unwrap();
+                Ok(Expr::Literal {
+                    value: Value::Number(n),
+                })
+            }
 
-        // IMPORTANT: For now, mark identifiers as strings as well.
-        if self.consume_on_type(&[TokenType::String, TokenType::Identifier]) {
-            let raw = self.previous().lexeme;
-            let s = raw.trim_matches('"').to_string();
-            return Ok(Expr::Literal {
-                value: Value::Str(s),
-            });
-        }
+            // IMPORTANT: For now, mark identifiers as strings as well.
+            TokenType::String | TokenType::Identifier => {
+                let raw = self.advance().lexeme;
+                let s = raw.trim_matches('"').to_string();
+                Ok(Expr::Literal {
+                    value: Value::Str(s),
+                })
+            }
 
-        if self.consume_on_type(&[TokenType::LeftParen]) {
-            let inner = self.expression()?;
-            self.expect(TokenType::RightParen, "Expected ')' after expression")?;
-            return Ok(Expr::Grouping {
-                expression: Box::new(inner),
-            });
-        }
+            TokenType::LeftParen => {
+                self.advance();
+                let inner = self.expression()?;
+                self.expect(TokenType::RightParen, "Expected ')' after expression")?;
+                Ok(Expr::Grouping {
+                    expression: Box::new(inner),
+                })
+            }
 
-        Err(ParseError {
-            token: *self.peek(),
-            message: "Expected expression".to_string(),
-        })
+            _ => Err(ParseError {
+                token: *self.peek(),
+                message: "Expected expression".to_string(),
+            }),
+        }
     }
 
     fn element(&mut self) -> Result<Element<'a>, ParseError<'a>> {
