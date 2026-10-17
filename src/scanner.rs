@@ -78,13 +78,13 @@ impl<'a> Tokenizer<'a> {
     // skip whitespace entirely (no token emitted); count newlines so lines stay accurate
     fn skip_whitespace(&mut self) {
         while let Some(c) = self.peek() {
-            if c == '\n' {
-                self.line += 1;
-                self.cursor += c.len_utf8();
-            } else if c.is_whitespace() {
-                self.cursor += c.len_utf8();
-            } else {
-                break;
+            match c {
+                '\n' => {
+                    self.line += 1;
+                    self.cursor += c.len_utf8();
+                }
+                c if c.is_whitespace() => self.cursor += c.len_utf8(),
+                _ => break,
             }
         }
     }
@@ -133,157 +133,154 @@ impl<'a> Tokenizer<'a> {
 
             let start = self.cursor;
 
-            // Numbers
-            if c.is_ascii_digit() {
-                self.consume_while(|c| c.is_ascii_digit());
-                let mut num_type = TokenType::Number;
-
-                // Float
-                // only when a digit follows the '.'
-                let mut after = self.remaining().chars();
-                if after.next() == Some('.') && after.next().is_some_and(|c| c.is_ascii_digit()) {
-                    self.cursor += '.'.len_utf8();
+            match c {
+                // Numbers
+                '0'..='9' => {
                     self.consume_while(|c| c.is_ascii_digit());
-                    num_type = TokenType::Float;
-                }
-                let text = &self.source[start..self.cursor];
-                tokens.push(Token::new(num_type, text, self.line));
-                continue;
-            }
+                    let mut num_type = TokenType::Number;
 
-            // alphabetic to not get the numbers
-            // start with a letter or '_', then letters, digits or '_'
-            if c.is_ascii_alphabetic() || c == '_' {
-                self.consume_while(|c| c.is_ascii_alphanumeric() || c == '_');
-                let text = &self.source[start..self.cursor];
-                tokens.push(Self::word_token(text, self.line));
-                continue;
-            }
-
-            // string literal: "..." may span lines; error only if EOF hits first
-            // Same yung " "
-            if c == '"' {
-                let quote = c;
-                self.cursor += c.len_utf8(); // consume opening quote
-                let content_start = self.cursor;
-                let mut closed = false;
-                while let Some(ch) = self.peek() {
-                    if ch == quote {
-                        closed = true;
-                        break;
+                    // Float
+                    // only when a digit follows the '.'
+                    let mut after = self.remaining().chars();
+                    if after.next() == Some('.') && after.next().is_some_and(|c| c.is_ascii_digit())
+                    {
+                        self.cursor += '.'.len_utf8();
+                        self.consume_while(|c| c.is_ascii_digit());
+                        num_type = TokenType::Float;
                     }
-                    if ch == '\n' {
-                        self.line += 1;
-                    }
-                    self.cursor += ch.len_utf8();
+                    let text = &self.source[start..self.cursor];
+                    tokens.push(Token::new(num_type, text, self.line));
                 }
-                if closed {
-                    let text = &self.source[content_start..self.cursor];
-                    self.cursor += c.len_utf8(); // Consumes the last quote
-                    tokens.push(Token::new(TokenType::String, text, self.line));
-                    continue;
-                } else {
-                    error.push(ScanError::UnterminatedString { line: self.line });
-                    continue;
-                }
-            }
 
-            // comments start with '#'
-            if c == '#' {
-                self.cursor += c.len_utf8(); // consume '#'
-                if self.consume_if('*') {
-                    // block comment '#* ... *#': may span lines, error if never closed
-                    loop {
-                        if self.remaining().is_empty() {
-                            error.push(ScanError::UnterminatedComment { line: self.line });
-                            break;
-                        }
-                        if self.remaining().starts_with("*#") {
-                            self.cursor += 2; // consume closing '*#'
-                            break;
-                        }
-                        let ch = self.peek().unwrap();
-                        if ch == '\n' {
-                            self.line += 1;
+                // alphabetic to not get the numbers
+                // start with a letter or '_', then letters, digits or '_'
+                'a'..='z' | 'A'..='Z' | '_' => {
+                    self.consume_while(|c| c.is_ascii_alphanumeric() || c == '_');
+                    let text = &self.source[start..self.cursor];
+                    tokens.push(Self::word_token(text, self.line));
+                }
+
+                // string literal: "..." may span lines; error only if EOF hits first
+                // Same yung " "
+                '"' => {
+                    self.cursor += c.len_utf8(); // consume opening quote
+                    let content_start = self.cursor;
+                    let mut closed = false;
+                    while let Some(ch) = self.peek() {
+                        match ch {
+                            '"' => {
+                                closed = true;
+                                break;
+                            }
+                            '\n' => self.line += 1,
+                            _ => {}
                         }
                         self.cursor += ch.len_utf8();
                     }
-                } else {
-                    // inline comment: run to end of line, the newline is left for skip_whitespace
-                    self.consume_while(|c| c != '\n');
+                    if closed {
+                        let text = &self.source[content_start..self.cursor];
+                        self.cursor += c.len_utf8(); // Consumes the last quote
+                        tokens.push(Token::new(TokenType::String, text, self.line));
+                    } else {
+                        error.push(ScanError::UnterminatedString { line: self.line });
+                    }
                 }
-                continue; // comment produces no token; scan the next one
-            }
 
-            // '==' equality operator, otherwise a single '=' assignment
-            if c == '=' {
-                self.cursor += c.len_utf8();
-                let tt = if self.consume_if('=') {
-                    TokenType::Equality
-                } else {
-                    TokenType::Equal
-                };
-                let text = &self.source[start..self.cursor];
-                tokens.push(Token::new(tt, text, self.line));
-                continue;
-            }
+                // comments start with '#'; a comment produces no token
+                '#' => {
+                    self.cursor += c.len_utf8(); // consume '#'
+                    if self.consume_if('*') {
+                        // block comment '#* ... *#': may span lines, error if never closed
+                        loop {
+                            match self.peek() {
+                                None => {
+                                    error.push(ScanError::UnterminatedComment { line: self.line });
+                                    break;
+                                }
+                                Some(_) if self.remaining().starts_with("*#") => {
+                                    self.cursor += 2; // consume closing '*#'
+                                    break;
+                                }
+                                Some('\n') => {
+                                    self.line += 1;
+                                    self.cursor += '\n'.len_utf8();
+                                }
+                                Some(ch) => self.cursor += ch.len_utf8(),
+                            }
+                        }
+                    } else {
+                        // inline comment: run to end of line, the newline is left for skip_whitespace
+                        self.consume_while(|c| c != '\n');
+                    }
+                }
 
-            // '<=' otherwise a single '<'
-            if c == '<' {
-                self.cursor += c.len_utf8();
-                let tt = if self.consume_if('=') {
-                    TokenType::LessEqual
-                } else {
-                    TokenType::Less
-                };
-                let text = &self.source[start..self.cursor];
-                tokens.push(Token::new(tt, text, self.line));
-                continue;
-            }
-
-            // '>=' otherwise a single '>'
-            if c == '>' {
-                self.cursor += c.len_utf8();
-                let tt = if self.consume_if('=') {
-                    TokenType::GreaterEqual
-                } else {
-                    TokenType::Greater
-                };
-                let text = &self.source[start..self.cursor];
-                tokens.push(Token::new(tt, text, self.line));
-                continue;
-            }
-
-            // '!=' not-equal; a lone '!' is not a valid token
-            if c == '!' {
-                self.cursor += c.len_utf8();
-                if self.consume_if('=') {
+                // '==' equality operator, otherwise a single '=' assignment
+                '=' => {
+                    self.cursor += c.len_utf8();
+                    let tt = if self.consume_if('=') {
+                        TokenType::Equality
+                    } else {
+                        TokenType::Equal
+                    };
                     let text = &self.source[start..self.cursor];
-                    tokens.push(Token::new(TokenType::NotEqual, text, self.line));
-                } else {
-                    error.push(ScanError::UnexpectedChar {
-                        line: self.line,
-                        ch: c,
-                    });
+                    tokens.push(Token::new(tt, text, self.line));
                 }
-                continue;
-            }
 
-            // other single-character tokens: ( ) + - * /
-            if let Some(tt) = Self::single_char_type(c) {
-                self.cursor += c.len_utf8();
-                let text = &self.source[start..self.cursor];
-                tokens.push(Token::new(tt, text, self.line));
-                continue;
-            }
+                // '<=' otherwise a single '<'
+                '<' => {
+                    self.cursor += c.len_utf8();
+                    let tt = if self.consume_if('=') {
+                        TokenType::LessEqual
+                    } else {
+                        TokenType::Less
+                    };
+                    let text = &self.source[start..self.cursor];
+                    tokens.push(Token::new(tt, text, self.line));
+                }
 
-            // any other, report it and continue
-            self.cursor += c.len_utf8();
-            error.push(ScanError::UnexpectedChar {
-                line: self.line,
-                ch: c,
-            });
-            continue;
+                // '>=' otherwise a single '>'
+                '>' => {
+                    self.cursor += c.len_utf8();
+                    let tt = if self.consume_if('=') {
+                        TokenType::GreaterEqual
+                    } else {
+                        TokenType::Greater
+                    };
+                    let text = &self.source[start..self.cursor];
+                    tokens.push(Token::new(tt, text, self.line));
+                }
+
+                // '!=' not-equal; a lone '!' is not a valid token
+                '!' => {
+                    self.cursor += c.len_utf8();
+                    if self.consume_if('=') {
+                        let text = &self.source[start..self.cursor];
+                        tokens.push(Token::new(TokenType::NotEqual, text, self.line));
+                    } else {
+                        error.push(ScanError::UnexpectedChar {
+                            line: self.line,
+                            ch: c,
+                        });
+                    }
+                }
+
+                _ => match Self::single_char_type(c) {
+                    // other single-character tokens: ( ) + - * /
+                    Some(tt) => {
+                        self.cursor += c.len_utf8();
+                        let text = &self.source[start..self.cursor];
+                        tokens.push(Token::new(tt, text, self.line));
+                    }
+                    // any other, report it and continue
+                    None => {
+                        self.cursor += c.len_utf8();
+                        error.push(ScanError::UnexpectedChar {
+                            line: self.line,
+                            ch: c,
+                        });
+                    }
+                },
+            }
         }
         (tokens, error)
     }
