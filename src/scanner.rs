@@ -32,6 +32,8 @@ pub struct Tokenizer<'a> {
     cursor: usize,
     // 1-based line number, advanced as newlines are consumed, for error reports
     line: usize,
+    // how many ( or { are open; a newline inside brackets is plain whitespace
+    depth: usize,
 }
 
 impl<'a> Tokenizer<'a> {
@@ -40,6 +42,7 @@ impl<'a> Tokenizer<'a> {
             source,
             cursor: 0,
             line: 1,
+            depth: 0,
         }
     }
 
@@ -75,15 +78,11 @@ impl<'a> Tokenizer<'a> {
         }
     }
 
-    // skip whitespace entirely (no token emitted); count newlines so lines stay accurate
+    // skip whitespace (no token emitted); stops at '\n' so scan() can give out a Newline
     fn skip_whitespace(&mut self) {
         while let Some(c) = self.peek() {
             match c {
-                '\n' => {
-                    self.line += 1;
-                    self.cursor += c.len_utf8();
-                }
-                c if c.is_whitespace() => self.cursor += c.len_utf8(),
+                c if c.is_whitespace() && c != '\n' => self.cursor += c.len_utf8(),  //added guard clause
                 _ => break,
             }
         }
@@ -134,6 +133,20 @@ impl<'a> Tokenizer<'a> {
             let start = self.cursor;
 
             match c {
+                // newline ends an expression, but only outside brackets;
+                // blank lines and a leading newline produce no token
+                '\n' => {
+                    self.cursor += c.len_utf8();
+                    let last_is_newline =
+                        matches!(tokens.last(), Some(t) if t.token_type == TokenType::Newline);
+
+                    // For the second newline guard clause (for if the next is )
+                    if self.depth == 0 && !tokens.is_empty() && !last_is_newline {
+                        tokens.push(Token::new(TokenType::Newline, "", self.line));
+                    }
+                    self.line += 1; // after pushing, so the token reports the line it ends
+                }
+
                 // Numbers
                 '0'..='9' => {
                     self.consume_while(|c| c.is_ascii_digit());
@@ -209,7 +222,7 @@ impl<'a> Tokenizer<'a> {
                             }
                         }
                     } else {
-                        // inline comment: run to end of line, the newline is left for skip_whitespace
+                        // inline comment: run to end of line, the newline is left for the '\n' arm
                         self.consume_while(|c| c != '\n');
                     }
                 }
@@ -270,6 +283,14 @@ impl<'a> Tokenizer<'a> {
                         self.cursor += c.len_utf8();
                         let text = &self.source[start..self.cursor];
                         tokens.push(Token::new(tt, text, self.line));
+                        // track open brackets; saturating_sub so a stray ')' can't underflow
+                        match tt {
+                            TokenType::LeftParen | TokenType::LeftBrace => self.depth += 1,
+                            TokenType::RightParen | TokenType::RightBrace => {
+                                self.depth = self.depth.saturating_sub(1) // if overflowed then stops it on the max boundary
+                            }
+                            _ => {}
+                        }
                     }
                     // any other, report it and continue
                     None => {
