@@ -46,6 +46,7 @@ pub enum TokenType {
     StyleWidth,
     StyleColor,
     StyleBorder,
+    Newline,
     Eof,
 }
 

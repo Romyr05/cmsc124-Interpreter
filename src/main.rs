@@ -54,8 +54,11 @@ fn tokenize_file(path: &str) {
     let source = fs::read_to_string(path).expect("could not read input file");
     let (tokens, errors) = Tokenizer::new(&source).scan();
 
+    // For newline token to hide them
     for token in &tokens {
-        println!("{:?}", token);
+        if token.token_type != TokenType::Newline {
+            println!("{:?}", token);
+        }
     }
     for e in &errors {
         eprintln!("{}", e);
