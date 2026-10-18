@@ -3,7 +3,7 @@ use crate::parser::{Parser, TopLevel};
 use crate::scanner::Tokenizer;
 use std::io::{self, Write};
 
-pub fn run() {
+pub fn run() -> io::Result<()> {
     let stdin = io::stdin();
     let mut command = String::new();
 
@@ -11,15 +11,16 @@ pub fn run() {
         command.clear();
 
         print!("> ");
-        io::stdout().flush().expect("Error flushing stdout.");
+        io::stdout().flush()?;
 
-        let bytes_read = stdin.read_line(&mut command).expect("Error reading input.");
+        let bytes_read = stdin.read_line(&mut command)?;
         if bytes_read == 0 {
             break;
         }
 
         eval_line(&command);
     }
+    Ok(())
 }
 
 // evaluate one line of input and print the value, or an error, then return to the prompt
