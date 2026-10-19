@@ -1,31 +1,8 @@
 // enum token with different types, kulang pa ni
+use crate::errors::ScanError;
 use crate::keyword_list::keywords_lookup;
 use crate::token_types::TokenType::Eof;
 use crate::token_types::{Token, TokenType};
-use std::fmt;
-
-// the malformed-input cases the scanner can report
-pub enum ScanError {
-    UnterminatedString { line: usize },
-    UnexpectedChar { line: usize, ch: char },
-    UnterminatedComment { line: usize },
-}
-
-impl fmt::Display for ScanError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ScanError::UnterminatedString { line } => {
-                write!(f, "[line {}] Error: Unterminated string.", line)
-            }
-            ScanError::UnexpectedChar { line, ch } => {
-                write!(f, "[line {}] Error: Unexpected character: {}", line, ch)
-            }
-            ScanError::UnterminatedComment { line } => {
-                write!(f, "[line {}] Error: Unterminated comment", line)
-            }
-        }
-    }
-}
 
 pub struct Tokenizer<'a> {
     source: &'a str,

@@ -1,4 +1,6 @@
 mod ast;
+mod code_generator;
+mod errors;
 mod evaluator;
 pub mod keyword_list;
 mod parser;
@@ -7,51 +9,48 @@ mod scanner;
 mod token_types;
 mod tree_printer;
 
+use crate::code_generator::generate;
+use crate::errors::CliError;
 use crate::evaluator::{evaluate, stringify};
 use crate::parser::{Parser, TopLevel};
 use crate::scanner::Tokenizer;
 use crate::token_types::TokenType;
 use crate::tree_printer::{print_element, print_expr};
-use std::fs;
-use std::process::exit;
+use std::{fs, process::ExitCode};
 
-fn main() {
+fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
 
-    match args.get(1).map(|s| s.as_str()) {
+    let result = match args.get(1).map(|s| s.as_str()) {
         // no command: drop into the interactive REPL
-        None => repl::run(),
+        None => repl::run().map_err(CliError::Io),
         Some("--parse") => match args.get(2) {
             Some(path) => parse_file(path),
-            None => {
-                eprintln!("--parse needs a file");
-                exit(64);
-            }
+            None => Err(CliError::Usage("--parse needs a file".to_string())),
         },
         Some("--eval") => match args.get(2) {
             Some(path) => eval_file(path),
-            None => {
-                eprintln!("--eval needs a file");
-                exit(64);
-            }
+            None => Err(CliError::Usage("--eval needs a file".to_string())),
         },
         Some("--tokenize") => match args.get(2) {
             Some(path) => tokenize_file(path),
-            None => {
-                eprintln!("--tokenize needs a file");
-                exit(64);
-            }
+            None => Err(CliError::Usage("--tokenize needs a file".to_string())),
         },
-        Some(other) => {
-            eprintln!("Unknown command: {}", other);
-            exit(64);
+        Some(other) => Err(CliError::Usage(format!("Unknown command: {}", other))),
+    };
+
+    match result {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("{}", error);
+            ExitCode::from(error.exit_code())
         }
     }
 }
 
 // --tokenize: print the scanned tokens
-fn tokenize_file(path: &str) {
-    let source = fs::read_to_string(path).expect("could not read input file");
+fn tokenize_file(path: &str) -> Result<(), CliError> {
+    let source = fs::read_to_string(path)?;
     let (tokens, errors) = Tokenizer::new(&source).scan();
 
     // For newline token to hide them
@@ -60,36 +59,43 @@ fn tokenize_file(path: &str) {
             println!("{:?}", token);
         }
     }
-    for e in &errors {
-        eprintln!("{}", e);
-    }
     if !errors.is_empty() {
-        exit(65);
+        let message = errors
+            .iter()
+            .map(|error| error.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(CliError::Compile(message));
     }
+    Ok(())
 }
 
 // --eval: evaluate each expression in the file and print its value, one per line.
 //Parse then -> Run
-fn eval_file(path: &str) {
+fn eval_file(path: &str) -> Result<(), CliError> {
     //Scanning whole file -> check if there are errors
-    let source = fs::read_to_string(path).expect("could not read input file");
+    let source = fs::read_to_string(path)?;
     let (tokens, errors) = Tokenizer::new(&source).scan();
 
-    for e in &errors {
-        eprintln!("{}", e);
-    }
     if !errors.is_empty() {
-        exit(65);
+        let message = errors
+            .iter()
+            .map(|error| error.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(CliError::Compile(message));
     }
 
     // check phase: report every syntax error; no running
     // Basically parsing whole file; stop -> error
     let (items, errors) = Parser::new(tokens).parse_program();
-    for err in &errors {
-        eprintln!("{}", err);
-    }
     if !errors.is_empty() {
-        exit(65); // rejected before running
+        let message = errors
+            .iter()
+            .map(|error| error.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(CliError::Compile(message)); // rejected before running
     }
 
     // run phase: the whole file is valid, stop at the first runtime error
@@ -98,39 +104,40 @@ fn eval_file(path: &str) {
         match item {
             TopLevel::Expr(expr) => match evaluate(expr) {
                 Ok(value) => println!("{}", stringify(&value)),
-                Err(err) => {
-                    eprintln!("{}", err);
-                    exit(70); // started running, then hit a runtime error
-                }
+                Err(err) => return Err(CliError::Runtime(err.to_string())),
             },
-            // elements parse, but evaluating them isn't supported yet
-            TopLevel::Element(_) => {
-                eprintln!("Runtime error: Elements can't be evaluated yet.");
-                exit(70);
-            }
+            TopLevel::Element(element) => match generate(element) {
+                Ok(html) => println!("{}", html),
+                Err(err) => return Err(CliError::Runtime(err.to_string())),
+            },
         }
     }
+    Ok(())
 }
 
 // --parse: print the AST tree
-fn parse_file(path: &str) {
-    let source = fs::read_to_string(path).expect("could not read input file");
+fn parse_file(path: &str) -> Result<(), CliError> {
+    let source = fs::read_to_string(path)?;
     let (tokens, errors) = Tokenizer::new(&source).scan();
 
     // a scan error means the tokens are unreliable, so stop before parsing
-    for e in &errors {
-        eprintln!("{}", e);
-    }
     if !errors.is_empty() {
-        exit(65);
+        let message = errors
+            .iter()
+            .map(|error| error.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(CliError::Compile(message));
     }
 
     let (items, errors) = Parser::new(tokens).parse_program();
-    for err in &errors {
-        eprintln!("{}", err);
-    }
     if !errors.is_empty() {
-        exit(65);
+        let message = errors
+            .iter()
+            .map(|error| error.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(CliError::Compile(message));
     }
 
     for item in &items {
@@ -139,4 +146,5 @@ fn parse_file(path: &str) {
             TopLevel::Element(element) => println!("{}", print_element(element)),
         }
     }
+    Ok(())
 }

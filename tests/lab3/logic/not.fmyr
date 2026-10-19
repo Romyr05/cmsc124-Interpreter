@@ -1,0 +1,7 @@
+not true
+not false
+not null
+not 0
+not ""
+not not 5
+not 1 + 2

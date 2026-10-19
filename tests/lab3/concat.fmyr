@@ -1,3 +1,0 @@
-"a" + "b"         # expect: ab
-"foo" + ""        # expect: foo
-"hello" + " " + "world"   # expect: hello world

@@ -1,6 +1,5 @@
-use std::fmt;
-
 use crate::ast::{Attribute, Element, Expr, Value};
+use crate::errors::ParseError;
 use crate::keyword_list::{is_attribute_keyword, is_element_keyword};
 use crate::token_types::{Token, TokenType};
 
@@ -13,24 +12,6 @@ use crate::token_types::{Token, TokenType};
 //   primary    -> NUMBER
 //
 // test: when receiving 2 + 3 * 4, it should output the tree as (2 + (3 * 4))
-
-#[derive(Debug)]
-pub struct ParseError<'a> {
-    pub token: Token<'a>,
-    pub message: String,
-}
-
-impl<'a> fmt::Display for ParseError<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.token.token_type {
-            TokenType::Eof => write!(f, "Error at end: {}", self.message),
-            TokenType::Newline => write!(f, "Error at end of line: {}", self.message),
-            _ => write!(f, "Error at '{}': {}", self.token.lexeme, self.message),
-        }
-    }
-}
-
-impl<'a> std::error::Error for ParseError<'a> {}
 
 pub struct Parser<'a> {
     tokens: Vec<Token<'a>>,
@@ -258,7 +239,16 @@ impl<'a> Parser<'a> {
         // TODO: add proper error handling, strings, and parentheses
         match self.peek().token_type {
             TokenType::Number | TokenType::Float => {
-                let n: f64 = self.advance().lexeme.parse().unwrap();
+                let token = *self.advance();
+                let n: f64 = match token.lexeme.parse() {
+                    Ok(number) => number,
+                    Err(_) => {
+                        return Err(ParseError {
+                            token,
+                            message: "Invalid number literal".to_string(),
+                        });
+                    }
+                };
                 Ok(Expr::Literal {
                     value: Value::Number(n),
                 })
