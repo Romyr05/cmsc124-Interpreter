@@ -1,4 +1,5 @@
 use std::fmt;
+use std::io;
 
 use crate::token_types::{Token, TokenType};
 
@@ -51,5 +52,40 @@ pub struct RuntimeError {
 impl fmt::Display for RuntimeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "[line {}] Runtime error: {}", self.line, self.message)
+    }
+}
+
+pub(crate) enum CliError {
+    Io(io::Error),
+    Usage(String),
+    Compile(String),
+    Runtime(String),
+}
+
+impl CliError {
+    pub(crate) fn exit_code(&self) -> u8 {
+        match self {
+            CliError::Io(_) => 74,
+            CliError::Usage(_) => 64,
+            CliError::Compile(_) => 65,
+            CliError::Runtime(_) => 70,
+        }
+    }
+}
+
+impl fmt::Display for CliError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CliError::Io(error) => write!(f, "I/O error: {}", error),
+            CliError::Usage(message) | CliError::Compile(message) | CliError::Runtime(message) => {
+                write!(f, "{}", message)
+            }
+        }
+    }
+}
+
+impl From<io::Error> for CliError {
+    fn from(error: io::Error) -> Self {
+        CliError::Io(error)
     }
 }

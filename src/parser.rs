@@ -239,7 +239,16 @@ impl<'a> Parser<'a> {
         // TODO: add proper error handling, strings, and parentheses
         match self.peek().token_type {
             TokenType::Number | TokenType::Float => {
-                let n: f64 = self.advance().lexeme.parse().unwrap();
+                let token = *self.advance();
+                let n: f64 = match token.lexeme.parse() {
+                    Ok(number) => number,
+                    Err(_) => {
+                        return Err(ParseError {
+                            token,
+                            message: "Invalid number literal".to_string(),
+                        });
+                    }
+                };
                 Ok(Expr::Literal {
                     value: Value::Number(n),
                 })
