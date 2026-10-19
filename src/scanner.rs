@@ -1,6 +1,6 @@
 // enum token with different types, kulang pa ni
-use crate::keyword_list::keywords_lookup;
 use crate::errors::ScanError;
+use crate::keyword_list::keywords_lookup;
 use crate::token_types::TokenType::Eof;
 use crate::token_types::{Token, TokenType};
 

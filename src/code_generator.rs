@@ -30,5 +30,8 @@ pub fn generate(element: &Element<'_>) -> Result<String, RuntimeError> {
 
     append_expressions(element, &mut body)?;
 
-    Ok(format!("{}{}{}{}{}{}{}", html_start, head_start, head_end, body_start, body, body_end, html_end))
+    Ok(format!(
+        "{}{}{}{}{}{}{}",
+        html_start, head_start, head_end, body_start, body, body_end, html_end
+    ))
 }
