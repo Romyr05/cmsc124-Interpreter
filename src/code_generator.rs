@@ -1,21 +1,58 @@
-use crate::ast::{Element, Expr};
+use crate::ast::Element;
 use crate::errors::RuntimeError;
 use crate::evaluator::{evaluate, stringify};
 use crate::parser::TopLevel;
+use crate::token_types::TokenType;
 
-fn append_expressions(element: &Element<'_>, body: &mut String) -> Result<(), RuntimeError> {
+fn append_children(
+    element: &Element<'_>,
+    body: &mut String,
+    escape_text: bool,
+) -> Result<(), RuntimeError> {
     for child in &element.children {
         match child {
-            TopLevel::Expr(expr) => append_expression(expr, body)?,
-            TopLevel::Element(element) => append_expressions(element, body)?,
+            TopLevel::Expr(expr) => {
+                let value = stringify(&evaluate(expr)?);
+                if escape_text {
+                    body.push_str(&escape_html(&value));
+                } else {
+                    body.push_str(&value);
+                }
+            }
+            TopLevel::Element(element) => append_element(element, body)?,
         }
     }
     Ok(())
 }
 
-fn append_expression(expr: &Expr<'_>, body: &mut String) -> Result<(), RuntimeError> {
-    body.push_str(&stringify(&evaluate(expr)?));
+fn append_element(element: &Element<'_>, body: &mut String) -> Result<(), RuntimeError> {
+    match element.kind {
+        TokenType::Text => {
+            body.push_str("<h1>");
+            append_children(element, body, true)?;
+            body.push_str("</h1>");
+        }
+        TokenType::Paragraph => {
+            body.push_str("<p>");
+            append_children(element, body, true)?;
+            body.push_str("</p>");
+        }
+        TokenType::Div => {
+            body.push_str("<div>");
+            append_children(element, body, true)?;
+            body.push_str("</div>");
+        }
+        _ => append_children(element, body, false)?,
+    }
     Ok(())
+}
+
+fn escape_html(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 // Generate the HTML document for an element AST.
@@ -28,7 +65,7 @@ pub fn generate(element: &Element<'_>) -> Result<String, RuntimeError> {
     let body_end = "</body>";
     let mut body = String::new();
 
-    append_expressions(element, &mut body)?;
+    append_element(element, &mut body)?;
 
     Ok(format!(
         "{}{}{}{}{}{}{}",
