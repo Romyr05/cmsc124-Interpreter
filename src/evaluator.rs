@@ -1,22 +1,8 @@
 // Tree-walking evaluator: walks an Expr and produces a runtime Value.
 // Post-order traversal: each node evaluates its children before itself.
-use std::fmt;
-
 use crate::ast::{Expr, Value};
+use crate::errors::RuntimeError;
 use crate::token_types::{Token, TokenType};
-
-// a runtime error carries the line (from the operator token) and a message.
-// kept minimal: the lab forbids the host language panicking on bad input.
-pub struct RuntimeError {
-    pub line: usize,
-    pub message: String,
-}
-
-impl fmt::Display for RuntimeError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "[line {}] Runtime error: {}", self.line, self.message)
-    }
-}
 
 // the one entry point: ask what node this is and do the matching thing
 pub fn evaluate(expr: &Expr) -> Result<Value, RuntimeError> {

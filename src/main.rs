@@ -1,6 +1,7 @@
 mod ast;
 mod code_generator;
 mod evaluator;
+mod errors;
 pub mod keyword_list;
 mod parser;
 mod repl;
@@ -107,7 +108,13 @@ fn eval_file(path: &str) {
                 }
             },
             Ok(TopLevel::Element(element)) => {
-                println!("{}", code_generator::generate(&element));
+                match code_generator::generate(&element) {
+                    Ok(html) => println!("{}", html),
+                    Err(err) => {
+                        eprintln!("{}", err);
+                        exit(70);
+                    }
+                }
             }
             Err(err) => {
                 eprintln!("{}", err);
