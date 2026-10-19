@@ -1,7 +1,8 @@
-use crate::evaluator::{evaluate, stringify};
-use crate::parser::{Parser, TopLevel};
+use crate::evaluator::{ evaluate, stringify };
+use crate::parser::{ Parser, TopLevel };
+use crate::code_generator::generate;
 use crate::scanner::Tokenizer;
-use std::io::{self, Write};
+use std::io::{ self, Write };
 
 pub fn run() {
     let stdin = io::stdin();
@@ -34,11 +35,16 @@ fn eval_line(src: &str) {
 
     let mut parser = Parser::new(tokens);
     match parser.parse_top_level() {
-        Ok(TopLevel::Expr(expr)) => match evaluate(&expr) {
-            Ok(value) => println!("{}", stringify(&value)),
-            Err(err) => eprintln!("{}", err), // runtime error: report and keep the session alive
-        },
-        Ok(TopLevel::Element(_)) => {}
+        Ok(TopLevel::Expr(expr)) =>
+            match evaluate(&expr) {
+                Ok(value) => println!("{}", stringify(&value)),
+                Err(err) => eprintln!("{}", err), // runtime error: report and keep the session alive
+            }
+        Ok(TopLevel::Element(element)) =>
+            match generate(&element) {
+                Ok(html) => println!("{}", html),
+                Err(err) => eprintln!("{}", err),
+            }
         Err(err) => eprintln!("{}", err),
     }
 }

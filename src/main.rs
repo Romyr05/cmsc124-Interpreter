@@ -12,6 +12,7 @@ mod tree_printer;
 use crate::evaluator::{evaluate, stringify};
 use crate::parser::{Parser, TopLevel};
 use crate::scanner::Tokenizer;
+use crate::code_generator::generate;
 use crate::token_types::{Token, TokenType};
 use crate::tree_printer::{print_element, print_expr};
 use std::fs;
@@ -107,15 +108,14 @@ fn eval_file(path: &str) {
                     exit(70); // started running, then hit a runtime error
                 }
             },
-            Ok(TopLevel::Element(element)) => {
-                match code_generator::generate(&element) {
+            Ok(TopLevel::Element(element)) => 
+                match generate(&element) {
                     Ok(html) => println!("{}", html),
                     Err(err) => {
                         eprintln!("{}", err);
                         exit(70);
                     }
                 }
-            }
             Err(err) => {
                 eprintln!("{}", err);
                 exit(65); // rejected before running
