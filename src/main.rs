@@ -1,4 +1,5 @@
 mod ast;
+mod code_generator;
 mod evaluator;
 pub mod keyword_list;
 mod parser;
@@ -105,8 +106,9 @@ fn eval_file(path: &str) {
                     exit(70); // started running, then hit a runtime error
                 }
             },
-            // TBD need to be evaluated
-            Ok(TopLevel::Element(_)) => {}
+            Ok(TopLevel::Element(element)) => {
+                println!("{}", code_generator::generate(&element));
+            }
             Err(err) => {
                 eprintln!("{}", err);
                 exit(65); // rejected before running
