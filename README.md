@@ -105,7 +105,7 @@ Exit codes: 0 [when successful], 65 [when input invalid], 70 [when system error]
 | number | e.g. `42`, `3.14` | Numeric value (int or float, `Token::Number`) |
 | string | e.g. `"hello"`, escapes supported | Text value (`Token::String`) |
 | boolean | `true`, `false` | Boolean value (`Token::Boolean`) |
-| nil | `null` | Absence-of-value / null reference (`Token::Null`) |
+| null | `null` | Absence-of-value / null reference (`Token::Null`) |
 
 
 ### Identifiers

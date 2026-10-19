@@ -26,6 +26,8 @@ pub enum TokenType {
     Number,
     Float,
     String,
+    Boolean,
+    Null,
     Word,
     Identifier,
     Initialize,
@@ -44,6 +46,7 @@ pub enum TokenType {
     StyleWidth,
     StyleColor,
     StyleBorder,
+    Newline,
     Eof,
 }
 

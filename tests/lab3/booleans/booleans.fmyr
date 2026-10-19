@@ -1,0 +1,3 @@
+true     # expect: true
+false    # expect: false
+null     # expect: null

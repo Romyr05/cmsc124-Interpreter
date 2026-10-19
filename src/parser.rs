@@ -1,6 +1,5 @@
-use std::fmt;
-
 use crate::ast::{Attribute, Element, Expr, Value};
+use crate::errors::ParseError;
 use crate::keyword_list::{is_attribute_keyword, is_element_keyword};
 use crate::token_types::{Token, TokenType};
 
@@ -13,23 +12,6 @@ use crate::token_types::{Token, TokenType};
 //   primary    -> NUMBER
 //
 // test: when receiving 2 + 3 * 4, it should output the tree as (2 + (3 * 4))
-
-#[derive(Debug)]
-pub struct ParseError<'a> {
-    pub token: Token<'a>,
-    pub message: String,
-}
-
-impl<'a> fmt::Display for ParseError<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.token.token_type {
-            TokenType::Eof => write!(f, "Error at end: {}", self.message),
-            _ => write!(f, "Error at '{}': {}", self.token.lexeme, self.message),
-        }
-    }
-}
-
-impl<'a> std::error::Error for ParseError<'a> {}
 
 pub struct Parser<'a> {
     tokens: Vec<Token<'a>>,
@@ -272,6 +254,19 @@ impl<'a> Parser<'a> {
                 })
             }
 
+            // the keyword lookup only makes Boolean for "true"/"false"
+            TokenType::Boolean => {
+                let b = self.advance().lexeme == "true";
+                Ok(Expr::Literal {
+                    value: Value::Bool(b),
+                })
+            }
+
+            TokenType::Null => {
+                self.advance();
+                Ok(Expr::Literal { value: Value::Nil })
+            }
+
             // IMPORTANT: For now, mark identifiers as strings as well.
             TokenType::String | TokenType::Identifier => {
                 let raw = self.advance().lexeme;
@@ -373,6 +368,28 @@ impl<'a> Parser<'a> {
         !self.is_at_end() && is_element_keyword(self.peek().token_type)
     }
 
+    // parse every item in the file; on an error, record it and resume on the next line
+    // so all syntax errors are reported at once
+    pub fn parse_program(&mut self) -> Result<Vec<TopLevel<'a>>, Vec<ParseError<'a>>> {
+        let mut items = Vec::new();
+        let mut errors = Vec::new();
+        while !self.is_at_end() {
+            match self.parse_top_level() {
+                Ok(item) => items.push(item),
+                Err(err) => {
+                    errors.push(err);
+                    self.synchronize();
+                }
+            }
+        }
+        if errors.is_empty() {
+            Ok(items)
+        } else {
+            Err(errors)
+        }
+    }
+
+    // one element or expression, ended by a newline or the end of the file
     pub fn parse_top_level(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
         let result = if self.is_at_element_start() {
             TopLevel::Element(self.element()?)
@@ -380,13 +397,23 @@ impl<'a> Parser<'a> {
             TopLevel::Expr(self.expression()?)
         };
 
-        // Same leftover-input check as before, now shared by both branches.
-        if !self.is_at_end() {
+        // the terminator check, shared by both branches; consumes the newline
+        if !self.is_at_end() && !self.consume_on_type(&[TokenType::Newline]) {
             return Err(ParseError {
                 token: *self.peek(),
-                message: "Expected end of input".to_string(),
+                message: "Expected newline after expression".to_string(),
             });
         }
         Ok(result)
+    }
+
+    // error recovery: discard tokens up to and including the next newline,
+    // so parsing resumes at the start of the next line
+    fn synchronize(&mut self) {
+        while !self.is_at_end() {
+            if self.advance().token_type == TokenType::Newline {
+                return;
+            }
+        }
     }
 }

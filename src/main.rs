@@ -1,4 +1,6 @@
 mod ast;
+mod code_generator;
+mod errors;
 mod evaluator;
 pub mod keyword_list;
 mod parser;
@@ -7,47 +9,14 @@ mod scanner;
 mod token_types;
 mod tree_printer;
 
+use crate::code_generator::generate;
+use crate::errors::CliError;
 use crate::evaluator::{evaluate, stringify};
 use crate::parser::{Parser, TopLevel};
 use crate::scanner::Tokenizer;
-use crate::token_types::{Token, TokenType};
+use crate::token_types::TokenType;
 use crate::tree_printer::{print_element, print_expr};
-use std::{fmt, fs, io, process::ExitCode};
-
-enum CliError {
-    Io(io::Error),
-    Usage(String),
-    Compile(String),
-    Runtime(String),
-}
-
-impl CliError {
-    fn exit_code(&self) -> u8 {
-        match self {
-            CliError::Io(_) => 74,
-            CliError::Usage(_) => 64,
-            CliError::Compile(_) => 65,
-            CliError::Runtime(_) => 70,
-        }
-    }
-}
-
-impl fmt::Display for CliError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            CliError::Io(error) => write!(f, "I/O error: {}", error),
-            CliError::Usage(message) | CliError::Compile(message) | CliError::Runtime(message) => {
-                write!(f, "{}", message)
-            }
-        }
-    }
-}
-
-impl From<io::Error> for CliError {
-    fn from(error: io::Error) -> Self {
-        CliError::Io(error)
-    }
-}
+use std::{fs, process::ExitCode};
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().collect();
@@ -84,19 +53,27 @@ fn tokenize_file(path: &str) -> Result<(), CliError> {
     let source = fs::read_to_string(path)?;
     let (tokens, errors) = Tokenizer::new(&source).scan();
 
+    // For newline token to hide them
     for token in &tokens {
-        println!("{:?}", token);
+        if token.token_type != TokenType::Newline {
+            println!("{:?}", token);
+        }
     }
-    for e in &errors {
-        eprintln!("{}", e);
+    if !errors.is_empty() {
+        let message = errors
+            .iter()
+            .map(|error| error.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(CliError::Compile(message));
     }
-    // Scan errors are reported above; scanning continues so all diagnostics are shown.
     Ok(())
 }
 
 // --eval: evaluate each expression in the file and print its value, one per line.
-// One expression per line, so we group the scanned tokens by line number.
+//Parse then -> Run
 fn eval_file(path: &str) -> Result<(), CliError> {
+    //Scanning whole file -> check if there are errors
     let source = fs::read_to_string(path)?;
     let (tokens, errors) = Tokenizer::new(&source).scan();
 
@@ -109,33 +86,30 @@ fn eval_file(path: &str) -> Result<(), CliError> {
         return Err(CliError::Compile(message));
     }
 
-    // split the flat token stream into one group per source line
-    let mut groups: Vec<Vec<Token>> = Vec::new();
-    for token in tokens {
-        if token.token_type == TokenType::Eof {
-            continue;
-        }
-        match groups.last_mut() {
-            Some(group) if group.first().is_some_and(|first| first.line == token.line) => {
-                group.push(token);
-            }
-            _ => groups.push(vec![token]),
-        }
-    }
+    // check phase: report every syntax error; no running
+    // Basically parsing whole file; stop -> error
+    let items = Parser::new(tokens).parse_program().map_err(|errors| {
+        CliError::Compile(
+            errors
+                .iter()
+                .map(|error| error.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    })?;
 
-    for mut group in groups {
-        let line = group[0].line;
-        group.push(Token::new(TokenType::Eof, "", line)); // parser expects a trailing Eof
-
-        let mut parser = Parser::new(group);
-        match parser.parse_top_level() {
-            Ok(TopLevel::Expr(expr)) => match evaluate(&expr) {
+    // run phase: the whole file is valid, stop at the first runtime error
+    // We evaluate here
+    for item in &items {
+        match item {
+            TopLevel::Expr(expr) => match evaluate(expr) {
                 Ok(value) => println!("{}", stringify(&value)),
                 Err(err) => return Err(CliError::Runtime(err.to_string())),
             },
-            // TBD need to be evaluated
-            Ok(TopLevel::Element(_)) => {}
-            Err(err) => return Err(CliError::Compile(err.to_string())),
+            TopLevel::Element(element) => match generate(element) {
+                Ok(html) => println!("{}", html),
+                Err(err) => return Err(CliError::Runtime(err.to_string())),
+            },
         }
     }
     Ok(())
@@ -156,11 +130,21 @@ fn parse_file(path: &str) -> Result<(), CliError> {
         return Err(CliError::Compile(message));
     }
 
-    let mut parser = Parser::new(tokens);
-    match parser.parse_top_level() {
-        Ok(TopLevel::Expr(expr)) => println!("{}", print_expr(&expr)),
-        Ok(TopLevel::Element(element)) => println!("{}", print_element(&element)),
-        Err(err) => return Err(CliError::Compile(err.to_string())),
+    let items = Parser::new(tokens).parse_program().map_err(|errors| {
+        CliError::Compile(
+            errors
+                .iter()
+                .map(|error| error.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    })?;
+
+    for item in &items {
+        match item {
+            TopLevel::Expr(expr) => println!("{}", print_expr(expr)),
+            TopLevel::Element(element) => println!("{}", print_element(element)),
+        }
     }
     Ok(())
 }

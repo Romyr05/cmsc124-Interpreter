@@ -1,3 +1,4 @@
+use crate::code_generator::generate;
 use crate::evaluator::{evaluate, stringify};
 use crate::parser::{Parser, TopLevel};
 use crate::scanner::Tokenizer;
@@ -39,7 +40,10 @@ fn eval_line(src: &str) {
             Ok(value) => println!("{}", stringify(&value)),
             Err(err) => eprintln!("{}", err), // runtime error: report and keep the session alive
         },
-        Ok(TopLevel::Element(_)) => {}
+        Ok(TopLevel::Element(element)) => match generate(&element) {
+            Ok(html) => println!("{}", html),
+            Err(err) => eprintln!("{}", err),
+        },
         Err(err) => eprintln!("{}", err),
     }
 }
