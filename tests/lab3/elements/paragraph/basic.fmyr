@@ -1,1 +1,1 @@
-par() { "A paragraph" }
+par() { "A paragraph" }    # expect: <!DOCTYPE html><html lang="html"><head></head><body><p>A paragraph</p></body></html>

@@ -1,1 +1,1 @@
-"a" < "b"
+"a" < "b"    # expect runtime error: Operands must be numbers.
