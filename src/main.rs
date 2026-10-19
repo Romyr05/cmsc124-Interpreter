@@ -10,8 +10,8 @@ mod token_types;
 mod tree_printer;
 
 use crate::code_generator::generate;
-use crate::evaluator::{evaluate, stringify};
 use crate::errors::CliError;
+use crate::evaluator::{evaluate, stringify};
 use crate::parser::{Parser, TopLevel};
 use crate::scanner::Tokenizer;
 use crate::token_types::{Token, TokenType};
