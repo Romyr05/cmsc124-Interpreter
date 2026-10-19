@@ -10,7 +10,7 @@ mod tree_printer;
 use crate::evaluator::{evaluate, stringify};
 use crate::parser::{Parser, TopLevel};
 use crate::scanner::Tokenizer;
-use crate::token_types::{Token, TokenType};
+use crate::token_types::TokenType;
 use crate::tree_printer::{print_element, print_expr};
 use std::fs;
 use std::process::exit;
@@ -69,8 +69,9 @@ fn tokenize_file(path: &str) {
 }
 
 // --eval: evaluate each expression in the file and print its value, one per line.
-// One expression per line, so we group the scanned tokens by line number.
+//Parse then -> Run
 fn eval_file(path: &str) {
+    //Scanning whole file -> check if there are errors
     let source = fs::read_to_string(path).expect("could not read input file");
     let (tokens, errors) = Tokenizer::new(&source).scan();
 
@@ -81,38 +82,31 @@ fn eval_file(path: &str) {
         exit(65);
     }
 
-    // split the flat token stream into one group per source line
-    let mut groups: Vec<Vec<Token>> = Vec::new();
-    let mut current_line: Option<usize> = None;
-    for token in tokens {
-        if token.token_type == TokenType::Eof {
-            continue;
-        }
-        if current_line != Some(token.line) {
-            groups.push(Vec::new());
-            current_line = Some(token.line);
-        }
-        groups.last_mut().unwrap().push(token);
+    // check phase: report every syntax error; no running
+    // Basically parsing whole file; stop -> error
+    let (items, errors) = Parser::new(tokens).parse_program();
+    for err in &errors {
+        eprintln!("{}", err);
+    }
+    if !errors.is_empty() {
+        exit(65); // rejected before running
     }
 
-    for mut group in groups {
-        let line = group[0].line;
-        group.push(Token::new(TokenType::Eof, "", line)); // parser expects a trailing Eof
-
-        let mut parser = Parser::new(group);
-        match parser.parse_top_level() {
-            Ok(TopLevel::Expr(expr)) => match evaluate(&expr) {
+    // run phase: the whole file is valid, stop at the first runtime error
+    // We evaluate here
+    for item in &items {
+        match item {
+            TopLevel::Expr(expr) => match evaluate(expr) {
                 Ok(value) => println!("{}", stringify(&value)),
                 Err(err) => {
                     eprintln!("{}", err);
                     exit(70); // started running, then hit a runtime error
                 }
             },
-            // TBD need to be evaluated
-            Ok(TopLevel::Element(_)) => {}
-            Err(err) => {
-                eprintln!("{}", err);
-                exit(65); // rejected before running
+            // elements parse, but evaluating them isn't supported yet
+            TopLevel::Element(_) => {
+                eprintln!("Runtime error: Elements can't be evaluated yet.");
+                exit(70);
             }
         }
     }
@@ -131,13 +125,18 @@ fn parse_file(path: &str) {
         exit(65);
     }
 
-    let mut parser = Parser::new(tokens);
-    match parser.parse_top_level() {
-        Ok(TopLevel::Expr(expr)) => println!("{}", print_expr(&expr)),
-        Ok(TopLevel::Element(element)) => println!("{}", print_element(&element)),
-        Err(err) => {
-            eprintln!("{}", err);
-            exit(65);
+    let (items, errors) = Parser::new(tokens).parse_program();
+    for err in &errors {
+        eprintln!("{}", err);
+    }
+    if !errors.is_empty() {
+        exit(65);
+    }
+
+    for item in &items {
+        match item {
+            TopLevel::Expr(expr) => println!("{}", print_expr(expr)),
+            TopLevel::Element(element) => println!("{}", print_element(element)),
         }
     }
 }

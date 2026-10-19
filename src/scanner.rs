@@ -82,7 +82,7 @@ impl<'a> Tokenizer<'a> {
     fn skip_whitespace(&mut self) {
         while let Some(c) = self.peek() {
             match c {
-                c if c.is_whitespace() && c != '\n' => self.cursor += c.len_utf8(),  //added guard clause
+                c if c.is_whitespace() && c != '\n' => self.cursor += c.len_utf8(), //added guard clause
                 _ => break,
             }
         }
