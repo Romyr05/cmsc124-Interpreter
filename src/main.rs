@@ -88,15 +88,15 @@ fn eval_file(path: &str) -> Result<(), CliError> {
 
     // check phase: report every syntax error; no running
     // Basically parsing whole file; stop -> error
-    let (items, errors) = Parser::new(tokens).parse_program();
-    if !errors.is_empty() {
-        let message = errors
-            .iter()
-            .map(|error| error.to_string())
-            .collect::<Vec<_>>()
-            .join("\n");
-        return Err(CliError::Compile(message)); // rejected before running
-    }
+    let items = Parser::new(tokens).parse_program().map_err(|errors| {
+        CliError::Compile(
+            errors
+                .iter()
+                .map(|error| error.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    })?;
 
     // run phase: the whole file is valid, stop at the first runtime error
     // We evaluate here
@@ -130,15 +130,15 @@ fn parse_file(path: &str) -> Result<(), CliError> {
         return Err(CliError::Compile(message));
     }
 
-    let (items, errors) = Parser::new(tokens).parse_program();
-    if !errors.is_empty() {
-        let message = errors
-            .iter()
-            .map(|error| error.to_string())
-            .collect::<Vec<_>>()
-            .join("\n");
-        return Err(CliError::Compile(message));
-    }
+    let items = Parser::new(tokens).parse_program().map_err(|errors| {
+        CliError::Compile(
+            errors
+                .iter()
+                .map(|error| error.to_string())
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    })?;
 
     for item in &items {
         match item {

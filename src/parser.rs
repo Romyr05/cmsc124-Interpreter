@@ -370,7 +370,7 @@ impl<'a> Parser<'a> {
 
     // parse every item in the file; on an error, record it and resume on the next line
     // so all syntax errors are reported at once
-    pub fn parse_program(&mut self) -> (Vec<TopLevel<'a>>, Vec<ParseError<'a>>) {
+    pub fn parse_program(&mut self) -> Result<Vec<TopLevel<'a>>, Vec<ParseError<'a>>> {
         let mut items = Vec::new();
         let mut errors = Vec::new();
         while !self.is_at_end() {
@@ -382,7 +382,11 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        (items, errors)
+        if errors.is_empty() {
+            Ok(items)
+        } else {
+            Err(errors)
+        }
     }
 
     // one element or expression, ended by a newline or the end of the file
