@@ -56,10 +56,14 @@ fn tokenize_file(path: &str) -> Result<(), CliError> {
     for token in &tokens {
         println!("{:?}", token);
     }
-    for e in &errors {
-        eprintln!("{}", e);
+    if !errors.is_empty() {
+        let message = errors
+            .iter()
+            .map(|error| error.to_string())
+            .collect::<Vec<_>>()
+            .join("\n");
+        return Err(CliError::Compile(message));
     }
-    // Scan errors are reported above; scanning continues so all diagnostics are shown.
     Ok(())
 }
 
