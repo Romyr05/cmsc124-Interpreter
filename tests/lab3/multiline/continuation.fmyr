@@ -1,0 +1,4 @@
+1 + 2 +
+3         # expect: 6
+1 + 2     # expect: 3
+-3        # expect: -3
