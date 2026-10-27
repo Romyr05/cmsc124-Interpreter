@@ -275,7 +275,8 @@ impl<'a> Parser<'a> {
                 })
             }
 
-            // a name, not text: keep it separate from strings so the evaluator can tell them apart
+            // separated it from the string already so its good na
+            // just the same but with name and line for error handling purposes
             TokenType::Identifier => {
                 let token = *self.advance();
                 Ok(Expr::Variable {
