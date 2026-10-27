@@ -267,12 +267,20 @@ impl<'a> Parser<'a> {
                 Ok(Expr::Literal { value: Value::Nil })
             }
 
-            // IMPORTANT: For now, mark identifiers as strings as well.
-            TokenType::String | TokenType::Identifier => {
+            TokenType::String => {
                 let raw = self.advance().lexeme;
                 let s = raw.trim_matches('"').to_string();
                 Ok(Expr::Literal {
                     value: Value::Str(s),
+                })
+            }
+
+            // a name, not text: keep it separate from strings so the evaluator can tell them apart
+            TokenType::Identifier => {
+                let token = *self.advance();
+                Ok(Expr::Variable {
+                    name: token.lexeme.to_string(),
+                    line: token.line,
                 })
             }
 

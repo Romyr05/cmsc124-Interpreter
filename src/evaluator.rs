@@ -17,6 +17,11 @@ pub fn evaluate(expr: &Expr) -> Result<Value, RuntimeError> {
             operator,
             right,
         } => eval_binary(operator, left, right),
+        // no variables are stored yet (Lab 4), so every name is undefined
+        Expr::Variable { name, line } => Err(RuntimeError {
+            line: *line,
+            message: format!("Undefined variable '{}'.", name),
+        }),
     }
 }
 
