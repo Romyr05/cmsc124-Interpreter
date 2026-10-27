@@ -40,7 +40,28 @@ fn eval_unary(operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
     }
 }
 
+// this is short circuit same as module 
+// and/or: evaluate left first; only evaluate right if left doesn't already decide the answer
+fn eval_logical(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, RuntimeError> {
+    let left = is_truthy(&evaluate(left)?);
+    match operator.token_type {
+        // short-circuit: right never runs
+        TokenType::LogicAnd if !left => Ok(Value::Bool(false)),
+        TokenType::LogicOr if left => Ok(Value::Bool(true)),
+        // left didn't decide it, so right's truthiness is the answer
+        _ => Ok(Value::Bool(is_truthy(&evaluate(right)?))),
+    }
+}
+
 fn eval_binary(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, RuntimeError> {
+    // checked before the operands are evaluated so and/or can skip the right side
+    if matches!(
+        operator.token_type,
+        TokenType::LogicAnd | TokenType::LogicOr
+    ) {
+        return eval_logical(operator, left, right);
+    }
+
     let left = evaluate(left)?; // left, then right
     let right = evaluate(right)?;
 
