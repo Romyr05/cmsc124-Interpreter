@@ -1,0 +1,11 @@
+true and true          # expect: true
+true and false         # expect: false
+false or true          # expect: true
+false or false         # expect: false
+0 and true             # expect: true
+null or false          # expect: false
+false and ("a" - 1)    # expect: false
+true or ("a" - 1)      # expect: true
+true or true and false # expect: true
+true and
+false                  # expect: false
