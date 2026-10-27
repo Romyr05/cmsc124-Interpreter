@@ -40,7 +40,7 @@ fn eval_unary(operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
     }
 }
 
-// this is short circuit same as module 
+// this is short circuit same as module
 // and/or: evaluate left first; only evaluate right if left doesn't already decide the answer
 fn eval_logical(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, RuntimeError> {
     let left = is_truthy(&evaluate(left)?);
