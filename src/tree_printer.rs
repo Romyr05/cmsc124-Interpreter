@@ -17,6 +17,7 @@ pub fn print_expr(expr: &Expr<'_>) -> String {
             right,
         } => parenthesize(operator.lexeme, &[left.as_ref(), right.as_ref()]),
         Expr::Grouping { expression } => parenthesize("group", &[expression.as_ref()]),
+        Expr::Variable { name, .. } => name.clone(),
     }
 }
 
