@@ -96,25 +96,9 @@ impl<'a> Parser<'a> {
 
     // =
     fn assignment(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        let mut node = self.logic_and()?;
-
-        while self.consume_on_type(&[TokenType::Equal]) {
-            let operator = *self.previous();
-            self.skip_newlines();
-            let right = self.logic_and()?;
-            node = Expr::Binary {
-                left: Box::new(node),
-                operator,
-                right: Box::new(right),
-            };
-        }
-        Ok(node)
-    }
-
-    fn logic_and(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         let mut node = self.logic_or()?;
 
-        while self.consume_on_type(&[TokenType::LogicAnd]) {
+        while self.consume_on_type(&[TokenType::Equal]) {
             let operator = *self.previous();
             self.skip_newlines();
             let right = self.logic_or()?;
@@ -127,13 +111,29 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
-    fn logic_or(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+    fn logic_and(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         let mut node = self.logic_not()?;
+
+        while self.consume_on_type(&[TokenType::LogicAnd]) {
+            let operator = *self.previous();
+            self.skip_newlines();
+            let right = self.logic_not()?;
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        Ok(node)
+    }
+
+    fn logic_or(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.logic_and()?;
 
         while self.consume_on_type(&[TokenType::LogicOr]) {
             let operator = *self.previous();
             self.skip_newlines();
-            let right = self.logic_not()?;
+            let right = self.logic_and()?;
             node = Expr::Binary {
                 left: Box::new(node),
                 operator,

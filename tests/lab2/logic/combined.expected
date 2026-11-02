@@ -1,1 +1,1 @@
-(and a (or b c))
+(or (and a b) c)
