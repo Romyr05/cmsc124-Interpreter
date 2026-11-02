@@ -40,4 +40,9 @@ pub enum Expr<'a> {
     Grouping {
         expression: Box<Expr<'a>>,
     },
+    // a name like x; keeps its line so errors can point at it
+    Variable {
+        name: String,
+        line: usize,
+    },
 }
