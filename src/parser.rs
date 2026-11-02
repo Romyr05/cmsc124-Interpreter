@@ -79,6 +79,13 @@ impl<'a> Parser<'a> {
         false
     }
 
+    // after a binary operator the line can't be finished, so a newline there is a continuation
+    fn skip_newlines(&mut self) {
+        while self.is_type(TokenType::Newline) {
+            self.advance();
+        }
+    }
+
     // ---------- grammar rules ----------
     // Every rule returns Expr<'a> so the result borrows from the source
     // text ('a), NOT from the &mut self borrow.
@@ -89,25 +96,11 @@ impl<'a> Parser<'a> {
 
     // =
     fn assignment(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        let mut node = self.logic_and()?;
+        let mut node = self.logic_or()?;
 
         while self.consume_on_type(&[TokenType::Equal]) {
             let operator = *self.previous();
-            let right = self.logic_and()?;
-            node = Expr::Binary {
-                left: Box::new(node),
-                operator,
-                right: Box::new(right),
-            };
-        }
-        Ok(node)
-    }
-
-    fn logic_and(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        let mut node = self.logic_or()?;
-
-        while self.consume_on_type(&[TokenType::LogicAnd]) {
-            let operator = *self.previous();
+            self.skip_newlines();
             let right = self.logic_or()?;
             node = Expr::Binary {
                 left: Box::new(node),
@@ -118,12 +111,29 @@ impl<'a> Parser<'a> {
         Ok(node)
     }
 
-    fn logic_or(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+    fn logic_and(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         let mut node = self.logic_not()?;
+
+        while self.consume_on_type(&[TokenType::LogicAnd]) {
+            let operator = *self.previous();
+            self.skip_newlines();
+            let right = self.logic_not()?;
+            node = Expr::Binary {
+                left: Box::new(node),
+                operator,
+                right: Box::new(right),
+            };
+        }
+        Ok(node)
+    }
+
+    fn logic_or(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
+        let mut node = self.logic_and()?;
 
         while self.consume_on_type(&[TokenType::LogicOr]) {
             let operator = *self.previous();
-            let right = self.logic_not()?;
+            self.skip_newlines();
+            let right = self.logic_and()?;
             node = Expr::Binary {
                 left: Box::new(node),
                 operator,
@@ -159,6 +169,7 @@ impl<'a> Parser<'a> {
             TokenType::GreaterEqual,
         ]) {
             let operator = *self.previous();
+            self.skip_newlines();
             let right = self.term()?;
             node = Expr::Binary {
                 left: Box::new(node),
@@ -175,6 +186,7 @@ impl<'a> Parser<'a> {
 
         while self.consume_on_type(&[TokenType::Minus, TokenType::Plus]) {
             let operator = *self.previous();
+            self.skip_newlines();
             let right = self.factor()?;
             node = Expr::Binary {
                 left: Box::new(node),
@@ -191,6 +203,7 @@ impl<'a> Parser<'a> {
 
         while self.consume_on_type(&[TokenType::Star, TokenType::Slash]) {
             let operator = *self.previous();
+            self.skip_newlines();
             let right = self.unary()?;
             node = Expr::Binary {
                 left: Box::new(node),
@@ -223,6 +236,7 @@ impl<'a> Parser<'a> {
         match self.peek().token_type {
             TokenType::Caret => {
                 let operator = *self.advance();
+                self.skip_newlines();
                 let right = self.unary()?;
                 Ok(Expr::Binary {
                     left: Box::new(node),
