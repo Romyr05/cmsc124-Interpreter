@@ -1,0 +1,7 @@
+let a = 2
+let b = 3
+a + b        # expect: 5
+let c = a * b
+c            # expect: 6
+let s = "hi"
+s + " there" # expect: hi there

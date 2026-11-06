@@ -1,0 +1,2 @@
+let name = "Framyr"
+text() { name }    # expect: <!DOCTYPE html><html lang="html"><head></head><body><h1>Framyr</h1></body></html>
