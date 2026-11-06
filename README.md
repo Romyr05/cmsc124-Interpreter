@@ -191,10 +191,10 @@ Numbers are all `f64` (one numeric type, dynamically typed).
 
 ### Scope and bindings
 
-- Redeclaration in the same scope: [allowed or an error]
+- Redeclaration in the same scope: an error. `let x = 1` then `let x = 2` is a runtime error (exit 70): `Variable 'x' already declared.`
 - Uninitialized variable holds: [value]
 - Shadowing: [behavior]
-- Undefined name: [static error with exit 65, or runtime error with exit 70]
+- Undefined name: runtime error with exit 70: `[line N] Runtime error: Undefined variable 'name'.`
 
 ### Control flow and functions
 
