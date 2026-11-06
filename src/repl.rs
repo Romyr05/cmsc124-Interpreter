@@ -52,7 +52,7 @@ fn eval_line(src: &str, env: &mut Environment) {
             initializer,
             line,
         }) => {
-            if let Err(err) = env.declare(&name, &initializer, line) {
+            if let Err(err) = env.declare(&name, initializer.as_ref(), line) {
                 eprintln!("{}", err);
             }
         }

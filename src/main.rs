@@ -117,7 +117,7 @@ fn eval_file(path: &str) -> Result<(), CliError> {
                 initializer,
                 line,
             } => {
-                if let Err(err) = env.declare(name, initializer, *line) {
+                if let Err(err) = env.declare(name, initializer.as_ref(), *line) {
                     return Err(CliError::Runtime(err.to_string()));
                 }
             }
@@ -157,7 +157,7 @@ fn parse_file(path: &str) -> Result<(), CliError> {
             TopLevel::Element(element) => println!("{}", print_element(element)),
             TopLevel::Let {
                 name, initializer, ..
-            } => println!("{}", print_let(name, initializer)),
+            } => println!("{}", print_let(name, initializer.as_ref())),
         }
     }
     Ok(())

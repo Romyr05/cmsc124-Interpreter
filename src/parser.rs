@@ -23,9 +23,10 @@ pub enum TopLevel<'a> {
     Expr(Expr<'a>),
     Element(Element<'a>),
     // let name = initializer; line points at the name for error messages
+    // initializer is None for `let x` (declared, no value or type yet)
     Let {
         name: String,
-        initializer: Expr<'a>,
+        initializer: Option<Expr<'a>>,
         line: usize,
     },
 }
@@ -438,11 +439,15 @@ impl<'a> Parser<'a> {
         Ok(result)
     }
 
-    // let NAME = expression   (the `let` was already consumed)
+    // let NAME ( = expression )?   (the `let` was already consumed)
     fn let_declaration(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
         let name = *self.expect(TokenType::Identifier, "Expected variable name after 'let'")?;
-        self.expect(TokenType::Equal, "Expected '=' after variable name")?;
-        let initializer = self.expression()?;
+        // `= expression` is optional: `let x` declares x with no value yet
+        let initializer = if self.consume_on_type(&[TokenType::Equal]) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
         Ok(TopLevel::Let {
             name: name.lexeme.to_string(),
             initializer,

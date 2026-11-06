@@ -7,22 +7,26 @@ use std::collections::HashMap;
 
 // the interpreter's state: every binding (name -> value)
 // created once per file run / REPL session, so bindings survive between lines
+// None = declared with `let x` but not given a value yet
 #[derive(Default)]
 pub struct Environment {
-    values: HashMap<String, Value>,
+    values: HashMap<String, Option<Value>>,
 }
 
 impl Environment {
-    // let name = initializer
+    // let name = initializer   (or just `let name`, which stores no value)
     // evaluate first: if that fails we return early and the table is untouched
     // then check for redeclaration, then store
     pub fn declare(
         &mut self,
         name: &str,
-        initializer: &Expr,
+        initializer: Option<&Expr>,
         line: usize,
     ) -> Result<(), RuntimeError> {
-        let value = self.evaluate(initializer)?;
+        let value = match initializer {
+            Some(expr) => Some(self.evaluate(expr)?),
+            None => None,
+        };
         if self.values.contains_key(name) {
             return Err(RuntimeError {
                 line,
@@ -48,7 +52,12 @@ impl Environment {
             } => self.eval_binary(operator, left, right),
             // look the name up in the table; missing -> undefined
             Expr::Variable { name, line } => match self.values.get(name) {
-                Some(value) => Ok(value.clone()),
+                Some(Some(value)) => Ok(value.clone()),
+                // declared with `let x` but never given a value
+                Some(None) => Err(RuntimeError {
+                    line: *line,
+                    message: format!("Variable '{}' used before assignment.", name),
+                }),
                 None => Err(RuntimeError {
                     line: *line,
                     message: format!("Undefined variable '{}'.", name),
