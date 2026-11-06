@@ -1,7 +1,5 @@
-use crate::code_generator::generate;
-use crate::evaluator::{Environment, stringify};
-use crate::parser::{Parser, TopLevel};
-use crate::scanner::Tokenizer;
+use crate::evaluator::Environment;
+use crate::runner::run_source;
 use std::io::{self, Write};
 
 pub fn run() -> io::Result<()> {
@@ -27,35 +25,9 @@ pub fn run() -> io::Result<()> {
 }
 
 // evaluate one line of input and print the value, or an error, then return to the prompt
+// the same scan/parse/run path as file mode (runner.rs); errors are reported, not fatal
 fn eval_line(src: &str, env: &mut Environment) {
-    let (tokens, errors) = Tokenizer::new(src).scan();
-    for e in &errors {
-        eprintln!("{}", e);
-    }
-    if !errors.is_empty() {
-        return;
-    }
-
-    let mut parser = Parser::new(tokens);
-    match parser.parse_top_level() {
-        Ok(TopLevel::Expr(expr)) => match env.evaluate(&expr) {
-            Ok(value) => println!("{}", stringify(&value)),
-            Err(err) => eprintln!("{}", err), // runtime error: report and keep the session alive
-        },
-        Ok(TopLevel::Element(element)) => match generate(&element, env) {
-            Ok(html) => println!("{}", html),
-            Err(err) => eprintln!("{}", err),
-        },
-        // a declaration prints nothing; on error the table is left as it was
-        Ok(TopLevel::Let {
-            name,
-            initializer,
-            line,
-        }) => {
-            if let Err(err) = env.declare(&name, initializer.as_ref(), line) {
-                eprintln!("{}", err);
-            }
-        }
-        Err(err) => eprintln!("{}", err),
+    if let Err(err) = run_source(src, env) {
+        eprintln!("{}", err);
     }
 }
