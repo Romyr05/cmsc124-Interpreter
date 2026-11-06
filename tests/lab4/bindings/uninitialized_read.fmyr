@@ -1,0 +1,2 @@
+let x
+x    # expect runtime error: Variable 'x' used before assignment.
