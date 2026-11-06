@@ -3,6 +3,9 @@ true and false         # expect: false
 false or true          # expect: true
 false or false         # expect: false
 0 and true             # expect: true
+"" and true            # expect: true
+not 0                   # expect: false
+not ""                  # expect: false
 null or false          # expect: false
 false and ("a" - 1)    # expect: false
 true or ("a" - 1)      # expect: true
