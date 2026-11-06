@@ -29,6 +29,11 @@ pub fn print_attribute(attr: &Attribute) -> String {
     )
 }
 
+// let x = 1 + 2  ->  (let x (+ 1.0 2.0))
+pub fn print_let(name: &str, initializer: &Expr<'_>) -> String {
+    format!("(let {} {})", name, print_expr(initializer))
+}
+
 pub fn print_element(element: &Element) -> String {
     let mut parts = vec![element_name(element.kind).to_string()]; // Easy initialization of rust
 
@@ -40,6 +45,9 @@ pub fn print_element(element: &Element) -> String {
         parts.push(match child {
             TopLevel::Element(e) => print_element(e),
             TopLevel::Expr(e) => print_expr(e),
+            TopLevel::Let {
+                name, initializer, ..
+            } => print_let(name, initializer),
         });
     }
 

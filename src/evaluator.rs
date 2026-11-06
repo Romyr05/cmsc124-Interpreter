@@ -3,134 +3,175 @@
 use crate::ast::{Expr, Value};
 use crate::errors::RuntimeError;
 use crate::token_types::{Token, TokenType};
+use std::collections::HashMap;
 
-// the one entry point: ask what node this is and do the matching thing
-pub fn evaluate(expr: &Expr) -> Result<Value, RuntimeError> {
-    match expr {
-        // literal: value was built during parsing, just hand it back
-        Expr::Literal { value } => Ok(value.clone()),
-        // grouping: parentheses carry no runtime meaning, evaluate the inside
-        Expr::Grouping { expression } => evaluate(expression),
-        Expr::Unary { operator, right } => eval_unary(operator, right),
-        Expr::Binary {
-            left,
-            operator,
-            right,
-        } => eval_binary(operator, left, right),
-        // no variables are stored yet, so every name is undefined
-        // we cant store naything in here so everytime it will be undefined variable
-        // however still needs to have a node for the = to actually not error out
-        Expr::Variable { name, line } => Err(RuntimeError {
-            line: *line,
-            message: format!("Undefined variable '{}'.", name),
-        }),
-    }
+// the interpreter's state: every binding (name -> value)
+// created once per file run / REPL session, so bindings survive between lines
+#[derive(Default)]
+pub struct Environment {
+    values: HashMap<String, Value>,
 }
 
-fn eval_unary(operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
-    let right = evaluate(right)?; // operand first
-    match operator.token_type {
-        // arithmetic negation: operand must be a number
-        TokenType::Minus => match right {
-            Value::Number(n) => Ok(Value::Number(-n)),
+impl Environment {
+    // let name = initializer
+    // evaluate first: if that fails we return early and the table is untouched
+    // then check for redeclaration, then store
+    pub fn declare(
+        &mut self,
+        name: &str,
+        initializer: &Expr,
+        line: usize,
+    ) -> Result<(), RuntimeError> {
+        let value = self.evaluate(initializer)?;
+        if self.values.contains_key(name) {
+            return Err(RuntimeError {
+                line,
+                message: format!("Variable '{}' already declared.", name),
+            });
+        }
+        self.values.insert(name.to_string(), value);
+        Ok(())
+    }
+
+    // the one entry point: ask what node this is and do the matching thing
+    pub fn evaluate(&self, expr: &Expr) -> Result<Value, RuntimeError> {
+        match expr {
+            // literal: value was built during parsing, just hand it back
+            Expr::Literal { value } => Ok(value.clone()),
+            // grouping: parentheses carry no runtime meaning, evaluate the inside
+            Expr::Grouping { expression } => self.evaluate(expression),
+            Expr::Unary { operator, right } => self.eval_unary(operator, right),
+            Expr::Binary {
+                left,
+                operator,
+                right,
+            } => self.eval_binary(operator, left, right),
+            // look the name up in the table; missing -> undefined
+            Expr::Variable { name, line } => match self.values.get(name) {
+                Some(value) => Ok(value.clone()),
+                None => Err(RuntimeError {
+                    line: *line,
+                    message: format!("Undefined variable '{}'.", name),
+                }),
+            },
+        }
+    }
+
+    fn eval_unary(&self, operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
+        let right = self.evaluate(right)?; // operand first
+        match operator.token_type {
+            // arithmetic negation: operand must be a number
+            TokenType::Minus => match right {
+                Value::Number(n) => Ok(Value::Number(-n)),
+                _ => Err(RuntimeError {
+                    line: operator.line,
+                    message: "Operand must be a number.".to_string(),
+                }),
+            },
+            // logical not -> any value has a truthiness, so this never errors
+            TokenType::Not => Ok(Value::Bool(!is_truthy(&right))),
             _ => Err(RuntimeError {
                 line: operator.line,
-                message: "Operand must be a number.".to_string(),
+                message: "Unknown unary operator.".to_string(),
             }),
-        },
-        // logical not -> any value has a truthiness, so this never errors
-        TokenType::Not => Ok(Value::Bool(!is_truthy(&right))),
-        _ => Err(RuntimeError {
-            line: operator.line,
-            message: "Unknown unary operator.".to_string(),
-        }),
-    }
-}
-
-// this is short circuit same as module
-// and/or: evaluate left first; only evaluate right if left doesn't already decide the answer
-fn eval_logical(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, RuntimeError> {
-    let left = is_truthy(&evaluate(left)?);
-    match operator.token_type {
-        // short-circuit: right never runs
-        TokenType::LogicAnd if !left => Ok(Value::Bool(false)),
-        TokenType::LogicOr if left => Ok(Value::Bool(true)),
-        // left didn't decide it, so right's truthiness is the answer
-        _ => Ok(Value::Bool(is_truthy(&evaluate(right)?))),
-    }
-}
-
-fn eval_binary(operator: &Token, left: &Expr, right: &Expr) -> Result<Value, RuntimeError> {
-    // checked before the operands are evaluated so and/or can skip the right side
-    if matches!(
-        operator.token_type,
-        TokenType::LogicAnd | TokenType::LogicOr
-    ) {
-        return eval_logical(operator, left, right);
+        }
     }
 
-    let left = evaluate(left)?; // left, then right
-    let right = evaluate(right)?;
+    // this is short circuit same as module
+    // and/or: evaluate left first; only evaluate right if left doesn't already decide the answer
+    fn eval_logical(
+        &self,
+        operator: &Token,
+        left: &Expr,
+        right: &Expr,
+    ) -> Result<Value, RuntimeError> {
+        let left = is_truthy(&self.evaluate(left)?);
+        match operator.token_type {
+            // short-circuit: right never runs
+            TokenType::LogicAnd if !left => Ok(Value::Bool(false)),
+            TokenType::LogicOr if left => Ok(Value::Bool(true)),
+            // left didn't decide it, so right's truthiness is the answer
+            _ => Ok(Value::Bool(is_truthy(&self.evaluate(right)?))),
+        }
+    }
 
-    // each operator checks the types it needs
-    match operator.token_type {
-        // + adds two numbers or joins two strings, mixing two types -> error
-        TokenType::Plus => match (&left, &right) {
-            (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
+    fn eval_binary(
+        &self,
+        operator: &Token,
+        left: &Expr,
+        right: &Expr,
+    ) -> Result<Value, RuntimeError> {
+        // checked before the operands are evaluated so and/or can skip the right side
+        if matches!(
+            operator.token_type,
+            TokenType::LogicAnd | TokenType::LogicOr
+        ) {
+            return self.eval_logical(operator, left, right);
+        }
 
-            // Foir the concatenation of both string
-            (Value::Str(a), Value::Str(b)) => Ok(Value::Str(format!("{}{}", a, b))),
+        let left = self.evaluate(left)?; // left, then right
+        let right = self.evaluate(right)?;
+
+        // each operator checks the types it needs
+        match operator.token_type {
+            // + adds two numbers or joins two strings, mixing two types -> error
+            TokenType::Plus => match (&left, &right) {
+                (Value::Number(a), Value::Number(b)) => Ok(Value::Number(a + b)),
+
+                // Foir the concatenation of both string
+                (Value::Str(a), Value::Str(b)) => Ok(Value::Str(format!("{}{}", a, b))),
+                _ => Err(RuntimeError {
+                    line: operator.line,
+                    message: "Operands must be two numbers or two strings.".to_string(),
+                }),
+            },
+
+            TokenType::Minus => {
+                let (a, b) = number_operands(operator, &left, &right)?;
+                Ok(Value::Number(a - b))
+            }
+            TokenType::Star => {
+                let (a, b) = number_operands(operator, &left, &right)?;
+                Ok(Value::Number(a * b))
+            }
+            TokenType::Slash => {
+                let (a, b) = number_operands(operator, &left, &right)?;
+                Ok(Value::Number(a / b)) // a / 0 yields inf (IEEE 754)
+            }
+            TokenType::Caret => {
+                let (a, b) = number_operands(operator, &left, &right)?;
+                Ok(Value::Number(a.powf(b)))
+            }
+
+            // Comparison operators
+            TokenType::Less => {
+                let (a, b) = number_operands(operator, &left, &right)?;
+                Ok(Value::Bool(a < b))
+            }
+
+            TokenType::LessEqual => {
+                let (a, b) = number_operands(operator, &left, &right)?;
+                Ok(Value::Bool(a <= b))
+            }
+            TokenType::Greater => {
+                let (a, b) = number_operands(operator, &left, &right)?;
+                Ok(Value::Bool(a > b))
+            }
+            TokenType::GreaterEqual => {
+                let (a, b) = number_operands(operator, &left, &right)?;
+                Ok(Value::Bool(a >= b))
+            }
+
+            //Equality
+            // any pair of types is allowed but different types are never equal
+            TokenType::Equality => Ok(Value::Bool(left == right)),
+            TokenType::NotEqual => Ok(Value::Bool(left != right)),
+
             _ => Err(RuntimeError {
                 line: operator.line,
-                message: "Operands must be two numbers or two strings.".to_string(),
+                message: "Operator not supported yet.".to_string(),
             }),
-        },
-
-        TokenType::Minus => {
-            let (a, b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Number(a - b))
         }
-        TokenType::Star => {
-            let (a, b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Number(a * b))
-        }
-        TokenType::Slash => {
-            let (a, b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Number(a / b)) // a / 0 yields inf (IEEE 754)
-        }
-        TokenType::Caret => {
-            let (a, b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Number(a.powf(b)))
-        }
-
-        // Comparison operators
-        TokenType::Less => {
-            let (a, b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Bool(a < b))
-        }
-
-        TokenType::LessEqual => {
-            let (a, b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Bool(a <= b))
-        }
-        TokenType::Greater => {
-            let (a, b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Bool(a > b))
-        }
-        TokenType::GreaterEqual => {
-            let (a, b) = number_operands(operator, &left, &right)?;
-            Ok(Value::Bool(a >= b))
-        }
-
-        //Equality
-        // any pair of types is allowed but different types are never equal
-        TokenType::Equality => Ok(Value::Bool(left == right)),
-        TokenType::NotEqual => Ok(Value::Bool(left != right)),
-
-        _ => Err(RuntimeError {
-            line: operator.line,
-            message: "Operator not supported yet.".to_string(),
-        }),
     }
 }
 
