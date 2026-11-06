@@ -2,15 +2,16 @@
 // scan -> parse the whole source -> run each item, printing values and HTML.
 // The caller owns the Environment (so the REPL keeps bindings between lines)
 // and decides what an error means (file: exit 65/70, REPL: print and continue).
+// first_line is the line number of the source's first line (file: 1, REPL: session line).
 use crate::code_generator::generate;
 use crate::errors::CliError;
 use crate::evaluator::{Environment, stringify};
 use crate::parser::{Parser, TopLevel};
 use crate::scanner::Tokenizer;
 
-pub fn run_source(source: &str, env: &mut Environment) -> Result<(), CliError> {
+pub fn run_source(source: &str, env: &mut Environment, first_line: usize) -> Result<(), CliError> {
     //Scanning whole source -> check if there are errors
-    let (tokens, errors) = Tokenizer::new(source).scan();
+    let (tokens, errors) = Tokenizer::starting_at(source, first_line).scan();
 
     if !errors.is_empty() {
         let message = errors

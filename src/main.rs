@@ -77,7 +77,7 @@ fn eval_file(path: &str) -> Result<(), CliError> {
     let source = fs::read_to_string(path)?;
     // one environment for the whole file
     let mut env = Environment::default();
-    run_source(&source, &mut env)
+    run_source(&source, &mut env, 1)
 }
 
 // --parse: print the AST tree
