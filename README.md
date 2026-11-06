@@ -191,8 +191,11 @@ Numbers are all `f64` (one numeric type, dynamically typed).
 
 ### Scope and bindings
 
+- Declaration: `let name = expression`, or `let name` with no value yet. One global scope for now.
+- Visibility: a binding can be used on any line after its `let` (including element bodies and later REPL lines), never before.
+- Types: a variable's type is set by its first value and cannot change; assigning a value of a different type is a runtime error (assignment: #63).
 - Redeclaration in the same scope: an error. `let x = 1` then `let x = 2` is a runtime error (exit 70): `Variable 'x' already declared.`
-- Uninitialized variable holds: [value]
+- Uninitialized variable holds: nothing. `let x` has no value and no type until its first assignment; reading it first is a runtime error (exit 70): `Variable 'x' used before assignment.`
 - Shadowing: [behavior]
 - Undefined name: runtime error with exit 70: `[line N] Runtime error: Undefined variable 'name'.`
 
