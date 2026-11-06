@@ -15,10 +15,16 @@ pub struct Tokenizer<'a> {
 
 impl<'a> Tokenizer<'a> {
     pub fn new(source: &'a str) -> Self {
+        Self::starting_at(source, 1)
+    }
+
+    // same as new, but line numbers start at `line`
+    // (the REPL scans one input line at a time, so it passes its session line count)
+    pub fn starting_at(source: &'a str, line: usize) -> Self {
         Self {
             source,
             cursor: 0,
-            line: 1,
+            line,
             depth: 0,
         }
     }
