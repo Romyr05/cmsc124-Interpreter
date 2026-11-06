@@ -1,5 +1,6 @@
 {
-  "ext": ".testFile",  
+  "ext": ".fmyr",
+  "flag": "--eval",
   "mode": "sidecar",
   "run_entrypoint": "./run"
 }
