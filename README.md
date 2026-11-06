@@ -181,13 +181,31 @@ Numbers are all `f64` (one numeric type, dynamically typed).
 
 ### Truthiness
 
-[Week 2.]
+Only `false` and `null` are falsey. Numbers (including `0`) and strings
+(including `""`) are truthy. `not` returns the inverse truthiness as a boolean.
+`and` and `or` also return booleans: `and` skips its right operand when the
+left operand is falsey, and `or` skips it when the left operand is truthy.
 
 ### Operator semantics
 
-- Arithmetic (`+`, `-`, `*`, `/`, `^`): both operands must be numbers, else a runtime error.
-- Division by zero: yields `inf` (IEEE 754 host behavior).
-- `+` on strings, comparison, equality, and logic: [Week 2.]
+- `-`, `*`, `/`, and `^` require two numeric operands. Comparisons (`<`, `<=`,
+  `>`, `>=`) also require two numbers. A wrong operand type raises a runtime
+  error with exit code 70.
+- `+` accepts either two numbers or two strings. Two strings concatenate;
+  mixing a string and a number raises a runtime error with exit code 70.
+- Division follows IEEE 754 behavior: dividing a positive or negative number by
+  zero produces `inf` or `-inf`, and `0 / 0` produces `NaN`.
+- Equality (`==`, `!=`) accepts values of any types; values of different types
+  are unequal.
+- Comparisons are strict at `<` and `>` and inclusive at `<=` and `>=`; for
+  example, `2 < 2` is `false` and `2 <= 2` is `true`.
+
+### Errors during evaluation
+
+Invalid syntax, an unclosed grouping, or an unterminated string exits with code
+65 and produces no evaluated output. A runtime error exits with code 70. Output
+produced by earlier expressions remains visible, while the failing expression
+and later expressions produce no output.
 
 ### Scope and bindings
 
