@@ -1,0 +1,2 @@
+let x
+let x    # expect runtime error: Variable 'x' already declared.

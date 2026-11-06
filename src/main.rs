@@ -11,11 +11,11 @@ mod tree_printer;
 
 use crate::code_generator::generate;
 use crate::errors::CliError;
-use crate::evaluator::{evaluate, stringify};
+use crate::evaluator::{Environment, stringify};
 use crate::parser::{Parser, TopLevel};
 use crate::scanner::Tokenizer;
 use crate::token_types::TokenType;
-use crate::tree_printer::{print_element, print_expr};
+use crate::tree_printer::{print_element, print_expr, print_let};
 use std::{fs, process::ExitCode};
 
 fn main() -> ExitCode {
@@ -99,17 +99,28 @@ fn eval_file(path: &str) -> Result<(), CliError> {
     })?;
 
     // run phase: the whole file is valid, stop at the first runtime error
-    // We evaluate here
+    // We evaluate here; one environment for the whole file
+    let mut env = Environment::default();
     for item in &items {
         match item {
-            TopLevel::Expr(expr) => match evaluate(expr) {
+            TopLevel::Expr(expr) => match env.evaluate(expr) {
                 Ok(value) => println!("{}", stringify(&value)),
                 Err(err) => return Err(CliError::Runtime(err.to_string())),
             },
-            TopLevel::Element(element) => match generate(element) {
+            TopLevel::Element(element) => match generate(element, &env) {
                 Ok(html) => println!("{}", html),
                 Err(err) => return Err(CliError::Runtime(err.to_string())),
             },
+            // a declaration prints nothing
+            TopLevel::Let {
+                name,
+                initializer,
+                line,
+            } => {
+                if let Err(err) = env.declare(name, initializer.as_ref(), *line) {
+                    return Err(CliError::Runtime(err.to_string()));
+                }
+            }
         }
     }
     Ok(())
@@ -144,6 +155,9 @@ fn parse_file(path: &str) -> Result<(), CliError> {
         match item {
             TopLevel::Expr(expr) => println!("{}", print_expr(expr)),
             TopLevel::Element(element) => println!("{}", print_element(element)),
+            TopLevel::Let {
+                name, initializer, ..
+            } => println!("{}", print_let(name, initializer.as_ref())),
         }
     }
     Ok(())

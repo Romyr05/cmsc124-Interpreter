@@ -1,0 +1,6 @@
+{
+  "ext": ".fmyr",
+  "flag": "--eval",
+  "mode": "inline",
+  "comment_prefix": "#"
+}

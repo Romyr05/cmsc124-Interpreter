@@ -1,0 +1,2 @@
+let a = 1
+missing    # expect runtime error: Undefined variable 'missing'.

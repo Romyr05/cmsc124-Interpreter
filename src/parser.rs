@@ -22,6 +22,13 @@ pub struct Parser<'a> {
 pub enum TopLevel<'a> {
     Expr(Expr<'a>),
     Element(Element<'a>),
+    // let name = initializer; line points at the name for error messages
+    // initializer is None for `let x` (declared, no value or type yet)
+    Let {
+        name: String,
+        initializer: Option<Expr<'a>>,
+        line: usize,
+    },
 }
 
 impl<'a> Parser<'a> {
@@ -416,6 +423,8 @@ impl<'a> Parser<'a> {
     pub fn parse_top_level(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
         let result = if self.is_at_element_start() {
             TopLevel::Element(self.element()?)
+        } else if self.consume_on_type(&[TokenType::Initialize]) {
+            self.let_declaration()?
         } else {
             TopLevel::Expr(self.expression()?)
         };
@@ -428,6 +437,22 @@ impl<'a> Parser<'a> {
             });
         }
         Ok(result)
+    }
+
+    // let NAME ( = expression )?   (the `let` was already consumed)
+    fn let_declaration(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        let name = *self.expect(TokenType::Identifier, "Expected variable name after 'let'")?;
+        // `= expression` is optional: `let x` declares x with no value yet
+        let initializer = if self.consume_on_type(&[TokenType::Equal]) {
+            Some(self.expression()?)
+        } else {
+            None
+        };
+        Ok(TopLevel::Let {
+            name: name.lexeme.to_string(),
+            initializer,
+            line: name.line,
+        })
     }
 
     // error recovery: discard tokens up to and including the next newline,
