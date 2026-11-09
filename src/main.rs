@@ -5,14 +5,15 @@ mod evaluator;
 pub mod keyword_list;
 mod parser;
 mod repl;
+mod runner;
 mod scanner;
 mod token_types;
 mod tree_printer;
 
-use crate::code_generator::generate;
 use crate::errors::CliError;
-use crate::evaluator::{Environment, stringify};
+use crate::evaluator::Environment;
 use crate::parser::{Parser, TopLevel};
+use crate::runner::run_source;
 use crate::scanner::Tokenizer;
 use crate::token_types::TokenType;
 use crate::tree_printer::{print_element, print_expr, print_let};
@@ -71,59 +72,12 @@ fn tokenize_file(path: &str) -> Result<(), CliError> {
 }
 
 // --eval: evaluate each expression in the file and print its value, one per line.
-//Parse then -> Run
+// scan, parse, and run are shared with the REPL (runner.rs)
 fn eval_file(path: &str) -> Result<(), CliError> {
-    //Scanning whole file -> check if there are errors
     let source = fs::read_to_string(path)?;
-    let (tokens, errors) = Tokenizer::new(&source).scan();
-
-    if !errors.is_empty() {
-        let message = errors
-            .iter()
-            .map(|error| error.to_string())
-            .collect::<Vec<_>>()
-            .join("\n");
-        return Err(CliError::Compile(message));
-    }
-
-    // check phase: report every syntax error; no running
-    // Basically parsing whole file; stop -> error
-    let items = Parser::new(tokens).parse_program().map_err(|errors| {
-        CliError::Compile(
-            errors
-                .iter()
-                .map(|error| error.to_string())
-                .collect::<Vec<_>>()
-                .join("\n"),
-        )
-    })?;
-
-    // run phase: the whole file is valid, stop at the first runtime error
-    // We evaluate here; one environment for the whole file
+    // one environment for the whole file
     let mut env = Environment::default();
-    for item in &items {
-        match item {
-            TopLevel::Expr(expr) => match env.evaluate(expr) {
-                Ok(value) => println!("{}", stringify(&value)),
-                Err(err) => return Err(CliError::Runtime(err.to_string())),
-            },
-            TopLevel::Element(element) => match generate(element, &env) {
-                Ok(html) => println!("{}", html),
-                Err(err) => return Err(CliError::Runtime(err.to_string())),
-            },
-            // a declaration prints nothing
-            TopLevel::Let {
-                name,
-                initializer,
-                line,
-            } => {
-                if let Err(err) = env.declare(name, initializer.as_ref(), *line) {
-                    return Err(CliError::Runtime(err.to_string()));
-                }
-            }
-        }
-    }
-    Ok(())
+    run_source(&source, &mut env, 1)
 }
 
 // --parse: print the AST tree
