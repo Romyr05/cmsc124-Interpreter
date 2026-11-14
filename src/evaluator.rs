@@ -91,8 +91,34 @@ impl Environment {
             } => self.declare(name, initializer.as_ref(), *line)?,
             // an assignment prints nothing, like a declaration
             TopLevel::Assign { name, value, line } => self.assign(name, value, *line)?,
+            // only the chosen branch runs; with no else, a falsey condition does nothing
+            TopLevel::If {
+                condition,
+                then_branch,
+                else_branch,
+            } => {
+                if is_truthy(&self.evaluate(condition)?) {
+                    self.execute_block(then_branch, print_values)?;
+                } else if let Some(branch) = else_branch {
+                    self.execute_block(branch, print_values)?;
+                }
+            }
         }
         Ok(())
+    }
+
+    // run a control-flow body in its own scope (restored even if a statement fails)
+    fn execute_block(
+        &mut self,
+        stmts: &[TopLevel],
+        print_values: bool,
+    ) -> Result<(), RuntimeError> {
+        self.in_new_scope(|env| {
+            for stmt in stmts {
+                env.execute(stmt, print_values)?;
+            }
+            Ok(())
+        })
     }
 
     // let name = initializer   (or just `let name`, which stores no value)

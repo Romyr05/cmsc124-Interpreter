@@ -32,6 +32,8 @@ pub enum TokenType {
     Identifier,
     Initialize,
     Print,
+    If,
+    Else,
     Button,
     Box,
     Text,

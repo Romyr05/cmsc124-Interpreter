@@ -5,6 +5,8 @@ pub fn keywords_lookup(word: &str) -> TokenType {
     match word {
         "let" => TokenType::Initialize,
         "print" => TokenType::Print,
+        "if" => TokenType::If,
+        "else" => TokenType::Else,
         "button" => TokenType::Button,
         "box" => TokenType::Box,
         "text" => TokenType::Text,

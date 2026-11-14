@@ -1,0 +1,3 @@
+if (true) {
+  div() { 1 }   # expect error: Elements are not allowed inside an if or while body
+}

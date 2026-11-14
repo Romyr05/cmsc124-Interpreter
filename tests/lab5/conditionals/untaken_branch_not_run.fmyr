@@ -1,0 +1,4 @@
+if (false) {
+  print(nope)
+}
+print("skipped")         # expect: skipped

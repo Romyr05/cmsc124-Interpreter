@@ -1,0 +1,6 @@
+let t = 20
+if (t > 30) {
+  print("hot")
+} else {
+  print("comfortable")  # expect: comfortable
+}

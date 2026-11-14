@@ -285,8 +285,12 @@ and later expressions produce no output.
 
 ### Control flow and functions
 
+- `if (condition) { ... } else { ... }`: parentheses and braces are required. The condition uses the truthiness rule above, and only the chosen branch runs; the other branch is never evaluated. `else` is optional: with no `else`, a falsey condition does nothing. `else if (...) { ... }` chains another condition.
+- `else` goes on the same line as the closing `}` (`} else {`), because the newline after `}` ends the `if` statement.
+- Each branch body is its own scope, like an element body: a `let` inside it disappears when the branch ends, and assignment can update outer bindings.
+- Branch bodies hold statements only (`let`, assignment, `print`, `if`, bare expressions); an element inside one is a parse error (exit 65). An `if` may appear inside an element body.
 - Logical operators return: [booleans, or the operand]
-- Dangling else binds to: [which if]
+- Dangling else binds to: the nearest `if`. With required braces the question only arises through `else if`, which always belongs to the `if` just before it.
 - Closure capture of a loop variable: [per iteration, or shared]
 - Function with no return statement produces: [value]
 - Arity mismatch: [message and exit code]

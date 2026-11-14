@@ -1,0 +1,3 @@
+if true {    # expect error: Expected '(' after 'if'
+  print(1)
+}

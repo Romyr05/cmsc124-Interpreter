@@ -1,0 +1,3 @@
+if (nope) {    # expect runtime error: Undefined variable 'nope'.
+  print(1)
+}
