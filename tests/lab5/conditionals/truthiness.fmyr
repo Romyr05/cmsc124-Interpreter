@@ -1,0 +1,8 @@
+if (0) {
+  print("0 is truthy")   # expect: 0 is truthy
+}
+if (null) {
+  print("null is truthy")
+} else {
+  print("null is falsey") # expect: null is falsey
+}

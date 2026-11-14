@@ -146,10 +146,18 @@ changelog.]
 ```
 program     -> ( statement ( NEWLINE | EOF ) )* EOF
 statement   -> element
+             | ifStmt
+             | whileStmt
              | letDecl
              | printStmt
              | assignment
              | exprStmt
+
+ifStmt      -> "if" "(" expression ")" block
+               ( "else" ( ifStmt | block ) )?
+whileStmt   -> "while" "(" expression ")" block
+block       -> "{" ( blockStmt | NEWLINE )* "}"
+blockStmt   -> ifStmt | whileStmt | letDecl | printStmt | assignment | exprStmt
 
 letDecl     -> "let" IDENTIFIER ( "=" expression )?
 printStmt   -> "print" "(" expression ")"
@@ -163,7 +171,8 @@ attribute   -> ATTRIBUTE "=" expression
 ATTRIBUTE   -> "id" | "class" | "align" | "padding" | "margin"
              | "height" | "width" | "color" | "border"
 body        -> ( child | NEWLINE )*
-child       -> element | letDecl | printStmt | assignment | exprStmt
+child       -> element | ifStmt | whileStmt | letDecl | printStmt
+             | assignment | exprStmt
 
 expression  -> logic_or
 logic_or    -> logic_and ( "or" logic_and )*
@@ -184,7 +193,8 @@ Newline rules:
 - A top-level statement ends at a NEWLINE (or end of file). Blank lines produce no NEWLINE token.
 - Inside `( )` newlines are ignored, so an expression or attribute list can span lines.
 - A line ending in a binary operator (or `=` of an assignment) continues on the next line.
-- Inside an element body `{ }`, newlines separate children, but children may also share a line.
+- Inside an element body or an `if`/`while` block `{ }`, newlines separate statements, but statements may also share a line.
+- `else` must follow the closing `}` on the same line (`} else {`).
 
 Statement notes:
 - `assignment` is chosen when a line starts with `IDENTIFIER "="`. `=` is not an expression operator, so assignment cannot appear inside an expression or be chained.
@@ -285,8 +295,13 @@ and later expressions produce no output.
 
 ### Control flow and functions
 
+- `if (condition) { ... } else { ... }`: parentheses and braces are required. The condition uses the truthiness rule above, and only the chosen branch runs; the other branch is never evaluated. `else` is optional: with no `else`, a falsey condition does nothing. `else if (...) { ... }` chains another condition.
+- `else` goes on the same line as the closing `}` (`} else {`), because the newline after `}` ends the `if` statement.
+- Each branch body is its own scope, like an element body: a `let` inside it disappears when the branch ends, and assignment can update outer bindings.
+- Branch bodies hold statements only (`let`, assignment, `print`, `if`, bare expressions); an element inside one is a parse error (exit 65). An `if` may appear inside an element body.
+- `while (condition) { ... }`: checks the condition, runs the body if truthy, and checks again. A falsey first check runs the body zero times. Assignment in the body updates the outer binding, which is how a loop ends. Each iteration gets a fresh body scope, so a `let` inside the body is new every time (no redeclaration error) and is gone after the loop. There is no `for` loop yet.
 - Logical operators return: [booleans, or the operand]
-- Dangling else binds to: [which if]
+- Dangling else binds to: the nearest `if`. With required braces the question only arises through `else if`, which always belongs to the `if` just before it.
 - Closure capture of a loop variable: [per iteration, or shared]
 - Function with no return statement produces: [value]
 - Arity mismatch: [message and exit code]

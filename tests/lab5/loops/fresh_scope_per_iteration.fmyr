@@ -1,0 +1,7 @@
+let i = 0
+while (i < 2) {
+  let square = i * i
+  print(square)  # expect: 0
+                 # expect: 1
+  i = i + 1
+}
