@@ -1,0 +1,11 @@
+let a = true
+let b = false
+if (a) {
+  if (b) {
+    print("a and b")
+  } else {
+    print("a only")     # expect: a only
+  }
+} else {
+  print("neither")
+}

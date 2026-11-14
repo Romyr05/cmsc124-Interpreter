@@ -40,6 +40,18 @@ pub enum TopLevel<'a> {
         value: Expr<'a>,
         line: usize,
     },
+    // if (condition) { then_branch } else { else_branch }; else is optional.
+    // `else if` is stored as an else_branch holding one If
+    If {
+        condition: Expr<'a>,
+        then_branch: Vec<TopLevel<'a>>,
+        else_branch: Option<Vec<TopLevel<'a>>>,
+    },
+    // while (condition) { body }
+    While {
+        condition: Expr<'a>,
+        body: Vec<TopLevel<'a>>,
+    },
 }
 
 impl<'a> Parser<'a> {
@@ -344,24 +356,7 @@ impl<'a> Parser<'a> {
         self.expect(TokenType::RightParen, "Expected ')' after attributes")?;
 
         // Gets the children
-        self.expect(TokenType::LeftBrace, "Expected '{' to start element body")?;
-        let mut children = Vec::new();
-        while !self.is_type(TokenType::RightBrace) && !self.is_at_end() {
-            // newlines inside a body separate children; blank lines are skipped,
-            // and children may also share a line
-            if self.consume_on_type(&[TokenType::Newline]) {
-                continue;
-            }
-            // a bad child is recorded and skipped; the rest of the body keeps parsing
-            match self.body_child() {
-                Ok(child) => children.push(child),
-                Err(err) => {
-                    self.errors.push(err);
-                    self.synchronize_body();
-                }
-            }
-        }
-        self.expect(TokenType::RightBrace, "Expected '}' to close element body")?;
+        let children = self.body(true, "element")?;
 
         Ok(Element {
             kind: kind.token_type,
@@ -370,10 +365,89 @@ impl<'a> Parser<'a> {
         })
     }
 
+    // { children }: shared by element bodies and if/else bodies.
+    // Newlines separate children; blank lines are skipped, and children may also
+    // share a line. A bad child is recorded and skipped; the rest keeps parsing.
+    // `what` names the body in error messages ("element", "if", "else", "while").
+    fn body(
+        &mut self,
+        allow_elements: bool,
+        what: &str,
+    ) -> Result<Vec<TopLevel<'a>>, ParseError<'a>> {
+        self.expect(
+            TokenType::LeftBrace,
+            &format!("Expected '{{' to start {} body", what),
+        )?;
+        let mut children = Vec::new();
+        while !self.is_type(TokenType::RightBrace) && !self.is_at_end() {
+            if self.consume_on_type(&[TokenType::Newline]) {
+                continue;
+            }
+            match self.body_child(allow_elements) {
+                Ok(child) => children.push(child),
+                Err(err) => {
+                    self.errors.push(err);
+                    self.synchronize_body();
+                }
+            }
+        }
+        self.expect(
+            TokenType::RightBrace,
+            &format!("Expected '}}' to close {} body", what),
+        )?;
+        Ok(children)
+    }
+
+    // if ( expression ) { statements } ( else if ... | else { statements } )?
+    // (the `if` was already consumed). `else` must be on the same line as the `}`,
+    // since the newline after `}` ends the statement. A dangling else binds to the
+    // nearest if: the innermost if_statement call is the one that sees it.
+    fn if_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        self.expect(TokenType::LeftParen, "Expected '(' after 'if'")?;
+        let condition = self.expression()?;
+        self.expect(TokenType::RightParen, "Expected ')' after if condition")?;
+        let then_branch = self.body(false, "if")?;
+        let else_branch = if self.consume_on_type(&[TokenType::Else]) {
+            if self.consume_on_type(&[TokenType::If]) {
+                // else if: an else whose body is another if
+                Some(vec![self.if_statement()?])
+            } else {
+                Some(self.body(false, "else")?)
+            }
+        } else {
+            None
+        };
+        Ok(TopLevel::If {
+            condition,
+            then_branch,
+            else_branch,
+        })
+    }
+
+    // while ( expression ) { statements }   (the `while` was already consumed)
+    fn while_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        self.expect(TokenType::LeftParen, "Expected '(' after 'while'")?;
+        let condition = self.expression()?;
+        self.expect(TokenType::RightParen, "Expected ')' after while condition")?;
+        let body = self.body(false, "while")?;
+        Ok(TopLevel::While { condition, body })
+    }
+
     // one child of an element body: a nested element, a let, a print, or an expression
-    fn body_child(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+    // (also if/else bodies, which pass allow_elements = false: statements only)
+    fn body_child(&mut self, allow_elements: bool) -> Result<TopLevel<'a>, ParseError<'a>> {
         if is_element_keyword(self.peek().token_type) {
+            if !allow_elements {
+                return Err(ParseError {
+                    token: *self.peek(),
+                    message: "Elements are not allowed inside an if or while body".to_string(),
+                });
+            }
             Ok(TopLevel::Element(self.element()?))
+        } else if self.consume_on_type(&[TokenType::If]) {
+            self.if_statement()
+        } else if self.consume_on_type(&[TokenType::While]) {
+            self.while_statement()
         } else if self.consume_on_type(&[TokenType::Initialize]) {
             self.let_declaration()
         } else if self.consume_on_type(&[TokenType::Print]) {
@@ -456,6 +530,10 @@ impl<'a> Parser<'a> {
             // When printing is found
         } else if self.consume_on_type(&[TokenType::Print]) {
             self.print_statement()?
+        } else if self.consume_on_type(&[TokenType::If]) {
+            self.if_statement()?
+        } else if self.consume_on_type(&[TokenType::While]) {
+            self.while_statement()?
         } else if self.is_at_assignment() {
             self.assignment_statement()?
         } else {
@@ -537,11 +615,17 @@ impl<'a> Parser<'a> {
     }
 
     // error recovery: discard tokens up to and including the next newline,
-    // so parsing resumes at the start of the next line
+    // so parsing resumes at the start of the next line. A { ... } opened on the
+    // bad line is skipped whole (its inner newlines don't count), so a broken
+    // `if` or element header doesn't leave a stray '}' to be reported again.
     fn synchronize(&mut self) {
+        let mut depth: usize = 0;
         while !self.is_at_end() {
-            if self.advance().token_type == TokenType::Newline {
-                return;
+            match self.advance().token_type {
+                TokenType::LeftBrace => depth += 1,
+                TokenType::RightBrace => depth = depth.saturating_sub(1),
+                TokenType::Newline if depth == 0 => return,
+                _ => {}
             }
         }
     }

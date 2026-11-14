@@ -1,0 +1,4 @@
+if (false) {
+  print("never")
+}
+print("after")           # expect: after

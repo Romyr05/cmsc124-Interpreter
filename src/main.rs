@@ -12,11 +12,11 @@ mod tree_printer;
 
 use crate::errors::CliError;
 use crate::evaluator::Environment;
-use crate::parser::{Parser, TopLevel};
+use crate::parser::Parser;
 use crate::runner::run_source;
 use crate::scanner::Tokenizer;
 use crate::token_types::TokenType;
-use crate::tree_printer::{print_element, print_expr, print_let};
+use crate::tree_printer::print_statement;
 use std::{fs, process::ExitCode};
 
 fn main() -> ExitCode {
@@ -117,19 +117,9 @@ fn parse_file(path: &str) -> Result<(), CliError> {
         )
     })?;
 
+    // each statement's --parse form lives in tree_printer::print_statement
     for item in &items {
-        match item {
-            TopLevel::Expr(expr) => println!("{}", print_expr(expr)),
-            TopLevel::Element(element) => println!("{}", print_element(element)),
-            TopLevel::Let {
-                name, initializer, ..
-            } => println!("{}", print_let(name, initializer.as_ref())),
-            TopLevel::Print(expr) => println!("(print {})", print_expr(expr)),
-            // same (= x value) form as the Lab 2 tree output
-            TopLevel::Assign { name, value, .. } => {
-                println!("(= {} {})", name, print_expr(value))
-            }
-        }
+        println!("{}", print_statement(item));
     }
     Ok(())
 }

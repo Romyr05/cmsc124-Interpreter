@@ -1,0 +1,6 @@
+let i = 0
+while (i < 1) {
+  let temp = 5
+  i = i + 1
+}
+print(temp)    # expect runtime error: Undefined variable 'temp'.
