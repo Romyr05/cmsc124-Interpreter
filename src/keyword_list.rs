@@ -4,6 +4,7 @@ use crate::token_types::TokenType;
 pub fn keywords_lookup(word: &str) -> TokenType {
     match word {
         "let" => TokenType::Initialize,
+        "print" => TokenType::Print,
         "button" => TokenType::Button,
         "box" => TokenType::Box,
         "text" => TokenType::Text,
