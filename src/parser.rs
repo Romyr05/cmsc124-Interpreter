@@ -19,6 +19,7 @@ pub struct Parser<'a> {
 }
 
 #[derive(Debug)]
+    //This just basically means a statemetn
 pub enum TopLevel<'a> {
     Expr(Expr<'a>),
     Element(Element<'a>),
@@ -429,6 +430,7 @@ impl<'a> Parser<'a> {
             TopLevel::Element(self.element()?)
         } else if self.consume_on_type(&[TokenType::Initialize]) {
             self.let_declaration()?
+            // When printing is found
         } else if self.consume_on_type(&[TokenType::Print]) {
             self.print_statement()?
         } else {
