@@ -34,7 +34,8 @@ impl Environment {
     // so after an error the REPL is back at the scope it started in.
     pub fn in_new_scope(
         &mut self,
-        work: impl FnOnce(&mut Environment) -> Result<(), RuntimeError>, // called only once to get what is the thing inside the inner
+        work: impl FnOnce(&mut Environment) -> Result<(), RuntimeError>,
+        // called only once to get what is the thing inside the inner
     ) -> Result<(), RuntimeError> {
         let outer = Rc::clone(&self.current);
         self.current = Rc::new(RefCell::new(Scope {
