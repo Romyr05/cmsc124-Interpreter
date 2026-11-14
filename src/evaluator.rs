@@ -3,17 +3,64 @@
 use crate::ast::{Expr, Value};
 use crate::errors::RuntimeError;
 use crate::token_types::{Token, TokenType};
+use std::cell::RefCell;
 use std::collections::HashMap;
+use std::rc::Rc;
 
-// the interpreter's state: every binding (name -> value)
-// created once per file run / REPL session, so bindings survive between lines
-// None = declared with `let x` but not given a value yet
+// one scope: its own bindings (name -> value) plus a link to the scope around it.
+// None = declared with `let x` but not given a value yet.
+// parent is None for the global scope.
+// Rc<RefCell<..>> = shared ownership + mutation checked at runtime
+// For reference and chainging the ownership and can mutate at runtime
+#[derive(Default)]
+struct Scope {
+    values: HashMap<String, Option<Value>>,
+    parent: Option<Rc<RefCell<Scope>>>,
+}
+
+// the interpreter's state: the scope code is currently running in.
+// created once per file run / REPL session, so global bindings survive between lines
+// used for the reference cell scope to see where it is currently ( inner and whatnot)
 #[derive(Default)]
 pub struct Environment {
-    values: HashMap<String, Option<Value>>,
+    current: Rc<RefCell<Scope>>,
 }
 
 impl Environment {
+    // run `work` in a new scope whose parent is the current one, then put the outer
+    // scope back. The restore always runs, even when work fails (no ? in between),
+    // so after an error the REPL is back at the scope it started in.
+    pub fn in_new_scope(
+        &mut self,
+        work: impl FnOnce(&mut Environment) -> Result<(), RuntimeError>, // called only once to get what is the thing inside the inner
+    ) -> Result<(), RuntimeError> {
+        let outer = Rc::clone(&self.current);
+        self.current = Rc::new(RefCell::new(Scope {
+            values: HashMap::new(),
+            parent: Some(Rc::clone(&outer)),
+        }));
+        let result = work(self);
+        self.current = outer;
+        result
+    }
+
+    // search from the current scope outward; the innermost scope that has the name wins
+    // outer None = no scope has it; inner None = declared but no value yet
+    fn lookup(&self, name: &str) -> Option<Option<Value>> {
+        let mut scope = Rc::clone(&self.current);
+        loop {
+            let parent = {
+                let s = scope.borrow();
+                if let Some(value) = s.values.get(name) {
+                    return Some(value.clone());
+                }
+                s.parent.clone()
+            };
+            // no parent left = searched every scope without finding it
+            scope = parent?;
+        }
+    }
+
     // let name = initializer   (or just `let name`, which stores no value)
     // evaluate first: if that fails we return early and the table is untouched
     // then check for redeclaration, then store
@@ -27,14 +74,44 @@ impl Environment {
             Some(expr) => Some(self.evaluate(expr)?),
             None => None,
         };
-        if self.values.contains_key(name) {
+        // only the current scope counts: an inner `let x` may shadow an outer x
+        let mut scope = self.current.borrow_mut();
+        if scope.values.contains_key(name) {
             return Err(RuntimeError {
                 line,
                 message: format!("Variable '{}' already declared.", name),
             });
         }
-        self.values.insert(name.to_string(), value);
+        scope.values.insert(name.to_string(), value);
         Ok(())
+    }
+
+    // name = value: evaluate first (an error leaves every scope untouched), then
+    // update the nearest scope, innermost outward, that already has the name.
+    // Never creates a binding; the new value may be a different type.
+    pub fn assign(&mut self, name: &str, value: &Expr, line: usize) -> Result<(), RuntimeError> {
+        let value = self.evaluate(value)?;
+        let mut scope = Rc::clone(&self.current);
+        loop {
+            let parent = {
+                let mut s = scope.borrow_mut();
+                if let Some(slot) = s.values.get_mut(name) {
+                    *slot = Some(value);
+                    return Ok(());
+                }
+                s.parent.clone()
+            };
+            match parent {
+                Some(p) => scope = p,
+                // searched every scope: assignment must not create the name
+                None => {
+                    return Err(RuntimeError {
+                        line,
+                        message: format!("Undefined variable '{}'.", name),
+                    });
+                }
+            }
+        }
     }
 
     // the one entry point: ask what node this is and do the matching thing
@@ -50,9 +127,9 @@ impl Environment {
                 operator,
                 right,
             } => self.eval_binary(operator, left, right),
-            // look the name up in the table; missing -> undefined
-            Expr::Variable { name, line } => match self.values.get(name) {
-                Some(Some(value)) => Ok(value.clone()),
+            // look the name up, innermost scope first; missing everywhere -> undefined
+            Expr::Variable { name, line } => match self.lookup(name) {
+                Some(Some(value)) => Ok(value),
                 // declared with `let x` but never given a value
                 Some(None) => Err(RuntimeError {
                     line: *line,

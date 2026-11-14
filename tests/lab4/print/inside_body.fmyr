@@ -1,0 +1,5 @@
+let x = 7
+div() {
+  text() { "page" }
+  print(x)      # expect: 7
+}               # expect: <!DOCTYPE html><html lang="html"><head></head><body><div><h1>page</h1></div></body></html>

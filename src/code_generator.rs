@@ -8,35 +8,45 @@ fn append_children(
     element: &Element<'_>,
     body: &mut String,
     escape_text: bool,
-    env: &Environment,
+    env: &mut Environment,
 ) -> Result<(), RuntimeError> {
-    for child in &element.children {
-        match child {
-            TopLevel::Expr(expr) => {
-                let value = stringify(&env.evaluate(expr)?);
-                if escape_text {
-                    body.push_str(&escape_html(&value));
-                } else {
-                    body.push_str(&value);
+    // the body is its own scope: created before the children run, and the outer
+    // scope is restored afterward, even if a child fails
+    // closure
+    env.in_new_scope(|env| {
+        for child in &element.children {
+            match child {
+                TopLevel::Expr(expr) => {
+                    let value = stringify(&env.evaluate(expr)?);
+                    if escape_text {
+                        body.push_str(&escape_html(&value));
+                    } else {
+                        body.push_str(&value);
+                    }
                 }
-            }
-            TopLevel::Element(element) => append_element(element, body, env)?,
-            // the parser never puts a let inside an element body
-            TopLevel::Let { line, .. } => {
-                return Err(RuntimeError {
-                    line: *line,
-                    message: "'let' is not allowed inside an element.".to_string(),
-                });
+                TopLevel::Element(element) => append_element(element, body, env)?,
+                // print goes straight to the terminal, never into body (the HTML),
+                // so its line appears before the element's HTML is printed
+                // For the terminal side; makes it a
+                TopLevel::Print(expr) => println!("{}", stringify(&env.evaluate(expr)?)),
+                // a let inside a body declares in this body's scope
+                TopLevel::Let {
+                    name,
+                    initializer,
+                    line,
+                } => env.declare(name, initializer.as_ref(), *line)?,
+                // an assignment in a body may update a binding from an outer scope
+                TopLevel::Assign { name, value, line } => env.assign(name, value, *line)?,
             }
         }
-    }
-    Ok(())
+        Ok(())
+    })
 }
 
 fn append_element(
     element: &Element<'_>,
     body: &mut String,
-    env: &Environment,
+    env: &mut Environment,
 ) -> Result<(), RuntimeError> {
     match element.kind {
         TokenType::Text => {
@@ -68,8 +78,8 @@ fn escape_html(text: &str) -> String {
 }
 
 // Generate the HTML document for an element AST.
-// env is read-only: element bodies can read bindings but not declare them
-pub fn generate(element: &Element<'_>, env: &Environment) -> Result<String, RuntimeError> {
+// env is mutable: element bodies are scopes and may declare their own bindings
+pub fn generate(element: &Element<'_>, env: &mut Environment) -> Result<String, RuntimeError> {
     let html_start = "<!DOCTYPE html><html lang=\"html\">";
     let html_end = "</html>";
     let head_start = "<head>";

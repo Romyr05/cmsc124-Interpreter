@@ -21,11 +21,13 @@ A domain-specific-language (DSL) designed for GUI-construction based around comp
 
 | Command | What it does |
 |---|---|
-| `./run <file>` | [Executes a program. Available from Lab 4.] |
+| `./run <file>` | Runs a program. Only `print()` and top-level elements produce output; bare expression values are evaluated and discarded. |
 | `./run --tokenize <file>` | [Prints the token stream.] |
 | `./run --parse <file>` | [Prints the parsed tree.] |
-| `./run --eval <file>` | [Evaluates each expression and prints its value.] |
-| `./run` | [Starts the REPL.] |
+| `./run --eval <file>` | Runs a program like `./run <file>`, but also prints each bare expression's value. |
+| `./run` | Starts the REPL; bare expression values are printed. |
+
+Every mode checks the whole source for scan/parse errors (65) before running anything.
 
 
 Exit codes: 0 [when successful], 65 [when input invalid], 70 [when system error].
@@ -125,10 +127,10 @@ Exit codes: 0 [when successful], 65 [when input invalid], 70 [when system error]
 
 ## Whitespace and termination
 
-- Whitespace significant: [yes or no, and where]
-- Statement terminator: [e.g. semicolon, newline, none]
-- Block delimiters: [e.g. braces, indentation]
-- Grouping delimiters: [e.g. parentheses]
+- Whitespace significant: only newlines. Spaces and indentation are ignored.
+- Statement terminator: newline, at top level and inside element bodies. Inside a body, children may also share one line (`div() { text() { "a" } text() { "b" } }`).
+- Block delimiters: braces `{ }` for element bodies. A newline inside braces still ends a line.
+- Grouping delimiters: parentheses `( )`. A newline inside parentheses is ignored, so an expression can continue across lines.
 
 ## Token output format
 
@@ -142,9 +144,51 @@ changelog.]
 ## Grammar
 
 ```
-[Your complete context-free grammar, current as of the latest activity.
-Unambiguous, with precedence and associativity encoded in rule structure.]
+program     -> ( statement ( NEWLINE | EOF ) )* EOF
+statement   -> element
+             | letDecl
+             | printStmt
+             | assignment
+             | exprStmt
+
+letDecl     -> "let" IDENTIFIER ( "=" expression )?
+printStmt   -> "print" "(" expression ")"
+assignment  -> IDENTIFIER "=" expression
+exprStmt    -> expression
+
+element     -> ELEMENT "(" attributes? ")" "{" body "}"
+ELEMENT     -> "button" | "box" | "text" | "image" | "div" | "par"
+attributes  -> attribute ( "," attribute )*
+attribute   -> ATTRIBUTE "=" expression
+ATTRIBUTE   -> "id" | "class" | "align" | "padding" | "margin"
+             | "height" | "width" | "color" | "border"
+body        -> ( child | NEWLINE )*
+child       -> element | letDecl | printStmt | assignment | exprStmt
+
+expression  -> logic_or
+logic_or    -> logic_and ( "or" logic_and )*
+logic_and   -> logic_not ( "and" logic_not )*
+logic_not   -> "not" logic_not | comparison
+comparison  -> term ( ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) term )*
+term        -> factor ( ( "+" | "-" ) factor )*
+factor      -> unary ( ( "*" | "/" ) unary )*
+unary       -> "-" unary | exponent
+exponent    -> primary ( "^" unary )?
+primary     -> NUMBER | FLOAT | STRING | "true" | "false" | "null"
+             | IDENTIFIER | "(" expression ")"
 ```
+
+Precedence, lowest to highest: `or`, `and`, `not`, comparisons, `+ -`, `* /`, unary `-`, `^`. All binary operators are left-associative except `^`, which is right-associative (`2^3^2` is `2^(3^2)`). Unary `-` binds looser than `^`, so `-2^2` is `-(2^2)`.
+
+Newline rules:
+- A top-level statement ends at a NEWLINE (or end of file). Blank lines produce no NEWLINE token.
+- Inside `( )` newlines are ignored, so an expression or attribute list can span lines.
+- A line ending in a binary operator (or `=` of an assignment) continues on the next line.
+- Inside an element body `{ }`, newlines separate children, but children may also share a line.
+
+Statement notes:
+- `assignment` is chosen when a line starts with `IDENTIFIER "="`. `=` is not an expression operator, so assignment cannot appear inside an expression or be chained.
+- `print` requires its parentheses; `print x` and `print()` are parse errors.
 
 ## Parse output format
 
@@ -179,6 +223,23 @@ Numbers are all `f64` (one numeric type, dynamically typed).
 - Nil: `nil`.
 - Strings: without quotes, so `"hi"` prints `hi`.
 
+### print
+
+- Syntax: `print(expression)` on its own line. Parentheses are required: `print x`, `print()`, and a missing `)` are parse errors (exit 65).
+- Output: the value is written to the terminal (stdout) using the rules above. It never becomes part of the generated HTML; page content comes from elements such as `text()`.
+- Allowed at top level and inside element bodies.
+- Ordering: inside an element, `print` runs immediately while the element is being built, but the element's HTML is printed only when the top-level element finishes. So the `print` line appears before that element's HTML:
+
+  ```
+  let x = 7
+  div() {
+    text() { "page" }
+    print(x)
+  }
+  ```
+  prints `7`, then the `<div>` HTML.
+- `--parse` shows it as `(print <expr>)`.
+
 ### Truthiness
 
 Only `false` and `null` are falsey. Numbers (including `0`) and strings
@@ -209,12 +270,17 @@ and later expressions produce no output.
 
 ### Scope and bindings
 
-- Declaration: `let name = expression`, or `let name` with no value yet. One global scope for now.
+- Declaration: `let name = expression`, or `let name` with no value yet. `let` creates the binding in the current scope.
+- Scopes: the file (or REPL session) is the global scope. Every element body `{ ... }` is a new scope nested inside the one around it, to any depth. Bindings declared in a body disappear when the body ends.
+- Lookup: a name is searched from the innermost scope outward; the first match wins.
+- Errors in a body: the body's scope is still discarded, so the REPL continues at the global scope.
 - Visibility: a binding can be used on any line after its `let` (including element bodies and later REPL lines), never before.
-- Types: dynamic. A variable has no fixed type; assignment may give it a value of any type (`let x = 5` then `x = "hi"` is allowed; assignment: #63).
+- Types: dynamic. A variable has no fixed type; assignment may give it a value of any type (`let x = 5` then `x = "hi"` is allowed).
+- Assignment: `name = expression` on its own line, a statement, not an expression. It evaluates the value, then updates the nearest scope (innermost outward) that already has `name`; an assignment inside an element body can update an outer binding. It never creates a binding, and it prints nothing.
+- Assignment errors: an unknown name is a runtime error (exit 70): `Undefined variable 'name'.` A target that isn't a plain name (`(1 + 2) = 3`) is a parse error (exit 65): `Invalid assignment target.` Chained assignment (`a = b = 3`) and assignment used as a value (`let y = (x = 5)`) are parse errors (exit 65).
 - Redeclaration in the same scope: an error. `let x = 1` then `let x = 2` is a runtime error (exit 70): `Variable 'x' already declared.`
 - Uninitialized variable holds: nothing. `let x` has no value until its first assignment; reading it first is a runtime error (exit 70): `Variable 'x' used before assignment.`
-- Shadowing: [behavior]
+- Shadowing: allowed across scopes. An inner `let x` hides an outer `x` inside that body without changing it; after the body ends, the outer `x` is visible again with its old value.
 - Undefined name: runtime error with exit 70: `[line N] Runtime error: Undefined variable 'name'.`
 
 ### Control flow and functions

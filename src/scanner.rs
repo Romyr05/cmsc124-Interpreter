@@ -9,7 +9,8 @@ pub struct Tokenizer<'a> {
     cursor: usize,
     // 1-based line number, advanced as newlines are consumed, for error reports
     line: usize,
-    // how many ( or { are open; a newline inside brackets is plain whitespace
+    // how many ( are open; a newline inside parentheses is plain whitespace.
+    // { } doesn't count: lines inside an element body still end at their newline
     depth: usize,
 }
 
@@ -116,7 +117,7 @@ impl<'a> Tokenizer<'a> {
             let start = self.cursor;
 
             match c {
-                // newline ends an expression, but only outside brackets;
+                // newline ends an expression, but only outside parentheses;
                 // blank lines and a leading newline produce no token
                 '\n' => {
                     self.cursor += c.len_utf8();
@@ -266,10 +267,10 @@ impl<'a> Tokenizer<'a> {
                         self.cursor += c.len_utf8();
                         let text = &self.source[start..self.cursor];
                         tokens.push(Token::new(tt, text, self.line));
-                        // track open brackets; saturating_sub so a stray ')' can't underflow
+                        // track open parentheses; saturating_sub so a stray ')' can't underflow
                         match tt {
-                            TokenType::LeftParen | TokenType::LeftBrace => self.depth += 1,
-                            TokenType::RightParen | TokenType::RightBrace => {
+                            TokenType::LeftParen => self.depth += 1,
+                            TokenType::RightParen => {
                                 self.depth = self.depth.saturating_sub(1) // if overflowed then stops it on the max boundary
                             }
                             _ => {}

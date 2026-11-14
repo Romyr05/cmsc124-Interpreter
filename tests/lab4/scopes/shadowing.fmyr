@@ -1,0 +1,6 @@
+let x = "outer"
+div() {
+  let x = "inner"
+  print(x)      # expect: inner
+}               # expect: <!DOCTYPE html><html lang="html"><head></head><body><div></div></body></html>
+print(x)        # expect: outer

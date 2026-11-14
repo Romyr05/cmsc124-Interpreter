@@ -31,6 +31,7 @@ pub enum TokenType {
     Word,
     Identifier,
     Initialize,
+    Print,
     Button,
     Box,
     Text,

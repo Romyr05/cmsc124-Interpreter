@@ -16,9 +16,12 @@ use crate::token_types::{Token, TokenType};
 pub struct Parser<'a> {
     tokens: Vec<Token<'a>>,
     current: usize,
+    // every syntax error found so far, in source order (top level and element bodies)
+    errors: Vec<ParseError<'a>>,
 }
 
 #[derive(Debug)]
+//This just basically means a statemetn
 pub enum TopLevel<'a> {
     Expr(Expr<'a>),
     Element(Element<'a>),
@@ -29,17 +32,34 @@ pub enum TopLevel<'a> {
         initializer: Option<Expr<'a>>,
         line: usize,
     },
+    // print(expression): writes the value to the terminal, never into HTML
+    Print(Expr<'a>),
+    // name = value: updates the nearest existing binding; line points at the name
+    Assign {
+        name: String,
+        value: Expr<'a>,
+        line: usize,
+    },
 }
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: Vec<Token<'a>>) -> Self {
-        Parser { tokens, current: 0 }
+        Parser {
+            tokens,
+            current: 0,
+            errors: Vec::new(),
+        }
     }
 
     // ---------- helper functions ----------
 
     fn peek(&self) -> &Token<'a> {
         &self.tokens[self.current]
+    }
+
+    // one token past peek()
+    fn peek_next(&self) -> &Token<'a> {
+        &self.tokens[(self.current + 1).min(self.tokens.len() - 1)] // .min for boundary checking to not pass its len no.
     }
 
     fn previous(&self) -> &Token<'a> {
@@ -97,25 +117,10 @@ impl<'a> Parser<'a> {
     // Every rule returns Expr<'a> so the result borrows from the source
     // text ('a), NOT from the &mut self borrow.
 
+    // assignment is a statement; which is our decisin  , so `=` is not part of
+    // the expression grammar: `let y = (x = 5)` is a parse error
     fn expression(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        self.assignment()
-    }
-
-    // =
-    fn assignment(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        let mut node = self.logic_or()?;
-
-        while self.consume_on_type(&[TokenType::Equal]) {
-            let operator = *self.previous();
-            self.skip_newlines();
-            let right = self.logic_or()?;
-            node = Expr::Binary {
-                left: Box::new(node),
-                operator,
-                right: Box::new(right),
-            };
-        }
-        Ok(node)
+        self.logic_or()
     }
 
     fn logic_and(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
@@ -342,10 +347,18 @@ impl<'a> Parser<'a> {
         self.expect(TokenType::LeftBrace, "Expected '{' to start element body")?;
         let mut children = Vec::new();
         while !self.is_type(TokenType::RightBrace) && !self.is_at_end() {
-            if is_element_keyword(self.peek().token_type) {
-                children.push(TopLevel::Element(self.element()?));
-            } else {
-                children.push(TopLevel::Expr(self.expression()?));
+            // newlines inside a body separate children; blank lines are skipped,
+            // and children may also share a line
+            if self.consume_on_type(&[TokenType::Newline]) {
+                continue;
+            }
+            // a bad child is recorded and skipped; the rest of the body keeps parsing
+            match self.body_child() {
+                Ok(child) => children.push(child),
+                Err(err) => {
+                    self.errors.push(err);
+                    self.synchronize_body();
+                }
             }
         }
         self.expect(TokenType::RightBrace, "Expected '}' to close element body")?;
@@ -355,6 +368,21 @@ impl<'a> Parser<'a> {
             attributes,
             children,
         })
+    }
+
+    // one child of an element body: a nested element, a let, a print, or an expression
+    fn body_child(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        if is_element_keyword(self.peek().token_type) {
+            Ok(TopLevel::Element(self.element()?))
+        } else if self.consume_on_type(&[TokenType::Initialize]) {
+            self.let_declaration()
+        } else if self.consume_on_type(&[TokenType::Print]) {
+            self.print_statement()
+        } else if self.is_at_assignment() {
+            self.assignment_statement() // for those identifier followed by =
+        } else {
+            self.expression_statement() // next to identifier is an not = 
+        }
     }
 
     fn attribute_list(&mut self) -> Result<Vec<Attribute<'a>>, ParseError<'a>> {
@@ -402,20 +430,20 @@ impl<'a> Parser<'a> {
     // so all syntax errors are reported at once
     pub fn parse_program(&mut self) -> Result<Vec<TopLevel<'a>>, Vec<ParseError<'a>>> {
         let mut items = Vec::new();
-        let mut errors = Vec::new();
         while !self.is_at_end() {
             match self.parse_top_level() {
                 Ok(item) => items.push(item),
                 Err(err) => {
-                    errors.push(err);
+                    self.errors.push(err);
                     self.synchronize();
                 }
             }
         }
-        if errors.is_empty() {
+        // errors from inside element bodies were already pushed while parsing them
+        if self.errors.is_empty() {
             Ok(items)
         } else {
-            Err(errors)
+            Err(std::mem::take(&mut self.errors))
         }
     }
 
@@ -425,8 +453,13 @@ impl<'a> Parser<'a> {
             TopLevel::Element(self.element()?)
         } else if self.consume_on_type(&[TokenType::Initialize]) {
             self.let_declaration()?
+            // When printing is found
+        } else if self.consume_on_type(&[TokenType::Print]) {
+            self.print_statement()?
+        } else if self.is_at_assignment() {
+            self.assignment_statement()?
         } else {
-            TopLevel::Expr(self.expression()?)
+            self.expression_statement()?
         };
 
         // the terminator check, shared by both branches; consumes the newline
@@ -455,6 +488,54 @@ impl<'a> Parser<'a> {
         })
     }
 
+    // an assignment starts with a name followed by '='
+    fn is_at_assignment(&self) -> bool {
+        self.peek().token_type == TokenType::Identifier
+            && self.peek_next().token_type == TokenType::Equal
+    }
+
+    // NAME = expression   (nothing consumed yet; is_at_assignment checked the first two tokens)
+    fn assignment_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        let name = *self.advance();
+        self.advance(); // the '='
+        self.skip_newlines(); // a line may end right after '=', like after an operator
+        let value = self.expression()?;
+        // `a = b = 3`: the value was `b`, and another '=' follows
+        if self.is_type(TokenType::Equal) {
+            return Err(ParseError {
+                token: *self.peek(),
+                message: "Assignment is a statement and can't be chained.".to_string(),
+            });
+        }
+        Ok(TopLevel::Assign {
+            name: name.lexeme.to_string(),
+            value,
+            line: name.line,
+        })
+    }
+
+    // a bare expression on its own; a '=' right after it means the left side
+    // wasn't a plain name, e.g. `(1 + 2) = 3`
+    fn expression_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        let expr = self.expression()?;
+        if self.is_type(TokenType::Equal) {
+            return Err(ParseError {
+                token: *self.peek(),
+                message: "Invalid assignment target.".to_string(),
+            });
+        }
+        Ok(TopLevel::Expr(expr))
+    }
+
+    // print ( expression )   (the `print` was already consumed)
+    // `print x` fails at '(', `print()` fails in expression(), a missing ')' fails at ')'
+    fn print_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        self.expect(TokenType::LeftParen, "Expected '(' after 'print'")?;
+        let expr = self.expression()?;
+        self.expect(TokenType::RightParen, "Expected ')' after print value")?;
+        Ok(TopLevel::Print(expr))
+    }
+
     // error recovery: discard tokens up to and including the next newline,
     // so parsing resumes at the start of the next line
     fn synchronize(&mut self) {
@@ -462,6 +543,27 @@ impl<'a> Parser<'a> {
             if self.advance().token_type == TokenType::Newline {
                 return;
             }
+        }
+    }
+
+    // error recovery inside an element body: discard the rest of the bad line.
+    // Stops after a newline, or before the '}' that closes this body (left for the
+    // children loop to close the element). A nested { ... } on the bad line is
+    // skipped whole, so its '}' doesn't close this body early.
+    fn synchronize_body(&mut self) {
+        let mut depth = 0;
+        while !self.is_at_end() {
+            match self.peek().token_type {
+                TokenType::RightBrace if depth == 0 => return,
+                TokenType::RightBrace => depth -= 1,
+                TokenType::LeftBrace => depth += 1,
+                TokenType::Newline if depth == 0 => {
+                    self.advance();
+                    return;
+                }
+                _ => {}
+            }
+            self.advance();
         }
     }
 }
