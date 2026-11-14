@@ -597,11 +597,17 @@ impl<'a> Parser<'a> {
     }
 
     // error recovery: discard tokens up to and including the next newline,
-    // so parsing resumes at the start of the next line
+    // so parsing resumes at the start of the next line. A { ... } opened on the
+    // bad line is skipped whole (its inner newlines don't count), so a broken
+    // `if` or element header doesn't leave a stray '}' to be reported again.
     fn synchronize(&mut self) {
+        let mut depth: usize = 0;
         while !self.is_at_end() {
-            if self.advance().token_type == TokenType::Newline {
-                return;
+            match self.advance().token_type {
+                TokenType::LeftBrace => depth += 1,
+                TokenType::RightBrace => depth = depth.saturating_sub(1),
+                TokenType::Newline if depth == 0 => return,
+                _ => {}
             }
         }
     }
