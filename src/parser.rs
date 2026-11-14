@@ -16,6 +16,8 @@ use crate::token_types::{Token, TokenType};
 pub struct Parser<'a> {
     tokens: Vec<Token<'a>>,
     current: usize,
+    // every syntax error found so far, in source order (top level and element bodies)
+    errors: Vec<ParseError<'a>>,
 }
 
 #[derive(Debug)]
@@ -36,7 +38,11 @@ pub enum TopLevel<'a> {
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: Vec<Token<'a>>) -> Self {
-        Parser { tokens, current: 0 }
+        Parser {
+            tokens,
+            current: 0,
+            errors: Vec::new(),
+        }
     }
 
     // ---------- helper functions ----------
@@ -350,12 +356,13 @@ impl<'a> Parser<'a> {
             if self.consume_on_type(&[TokenType::Newline]) {
                 continue;
             }
-            if is_element_keyword(self.peek().token_type) {
-                children.push(TopLevel::Element(self.element()?));
-            } else if self.consume_on_type(&[TokenType::Print]) {
-                children.push(self.print_statement()?);
-            } else {
-                children.push(TopLevel::Expr(self.expression()?));
+            // a bad child is recorded and skipped; the rest of the body keeps parsing
+            match self.body_child() {
+                Ok(child) => children.push(child),
+                Err(err) => {
+                    self.errors.push(err);
+                    self.synchronize_body();
+                }
             }
         }
         self.expect(TokenType::RightBrace, "Expected '}' to close element body")?;
@@ -365,6 +372,17 @@ impl<'a> Parser<'a> {
             attributes,
             children,
         })
+    }
+
+    // one child of an element body: a nested element, a print, or an expression
+    fn body_child(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        if is_element_keyword(self.peek().token_type) {
+            Ok(TopLevel::Element(self.element()?))
+        } else if self.consume_on_type(&[TokenType::Print]) {
+            self.print_statement()
+        } else {
+            Ok(TopLevel::Expr(self.expression()?))
+        }
     }
 
     fn attribute_list(&mut self) -> Result<Vec<Attribute<'a>>, ParseError<'a>> {
@@ -412,20 +430,20 @@ impl<'a> Parser<'a> {
     // so all syntax errors are reported at once
     pub fn parse_program(&mut self) -> Result<Vec<TopLevel<'a>>, Vec<ParseError<'a>>> {
         let mut items = Vec::new();
-        let mut errors = Vec::new();
         while !self.is_at_end() {
             match self.parse_top_level() {
                 Ok(item) => items.push(item),
                 Err(err) => {
-                    errors.push(err);
+                    self.errors.push(err);
                     self.synchronize();
                 }
             }
         }
-        if errors.is_empty() {
+        // errors from inside element bodies were already pushed while parsing them
+        if self.errors.is_empty() {
             Ok(items)
         } else {
-            Err(errors)
+            Err(std::mem::take(&mut self.errors))
         }
     }
 
@@ -484,6 +502,27 @@ impl<'a> Parser<'a> {
             if self.advance().token_type == TokenType::Newline {
                 return;
             }
+        }
+    }
+
+    // error recovery inside an element body: discard the rest of the bad line.
+    // Stops after a newline, or before the '}' that closes this body (left for the
+    // children loop to close the element). A nested { ... } on the bad line is
+    // skipped whole, so its '}' doesn't close this body early.
+    fn synchronize_body(&mut self) {
+        let mut depth = 0;
+        while !self.is_at_end() {
+            match self.peek().token_type {
+                TokenType::RightBrace if depth == 0 => return,
+                TokenType::RightBrace => depth -= 1,
+                TokenType::LeftBrace => depth += 1,
+                TokenType::Newline if depth == 0 => {
+                    self.advance();
+                    return;
+                }
+                _ => {}
+            }
+            self.advance();
         }
     }
 }
