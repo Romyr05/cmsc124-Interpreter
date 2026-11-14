@@ -37,6 +37,8 @@ fn main() -> ExitCode {
             Some(path) => tokenize_file(path),
             None => Err(CliError::Usage("--tokenize needs a file".to_string())),
         },
+        // anything that doesn't start with -- is a file to run
+        Some(path) if !path.starts_with("--") => run_file(path),
         Some(other) => Err(CliError::Usage(format!("Unknown command: {}", other))),
     };
 
@@ -77,7 +79,15 @@ fn eval_file(path: &str) -> Result<(), CliError> {
     let source = fs::read_to_string(path)?;
     // one environment for the whole file
     let mut env = Environment::default();
-    run_source(&source, &mut env, 1)
+    run_source(&source, &mut env, 1, true)
+}
+
+// plain ./run <file>: run the program; only print() and top-level elements produce output,
+// bare expression values are discarded
+fn run_file(path: &str) -> Result<(), CliError> {
+    let source = fs::read_to_string(path)?;
+    let mut env = Environment::default();
+    run_source(&source, &mut env, 1, false)
 }
 
 // --parse: print the AST tree
