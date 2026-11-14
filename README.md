@@ -144,9 +144,51 @@ changelog.]
 ## Grammar
 
 ```
-[Your complete context-free grammar, current as of the latest activity.
-Unambiguous, with precedence and associativity encoded in rule structure.]
+program     -> ( statement ( NEWLINE | EOF ) )* EOF
+statement   -> element
+             | letDecl
+             | printStmt
+             | assignment
+             | exprStmt
+
+letDecl     -> "let" IDENTIFIER ( "=" expression )?
+printStmt   -> "print" "(" expression ")"
+assignment  -> IDENTIFIER "=" expression
+exprStmt    -> expression
+
+element     -> ELEMENT "(" attributes? ")" "{" body "}"
+ELEMENT     -> "button" | "box" | "text" | "image" | "div" | "par"
+attributes  -> attribute ( "," attribute )*
+attribute   -> ATTRIBUTE "=" expression
+ATTRIBUTE   -> "id" | "class" | "align" | "padding" | "margin"
+             | "height" | "width" | "color" | "border"
+body        -> ( child | NEWLINE )*
+child       -> element | letDecl | printStmt | assignment | exprStmt
+
+expression  -> logic_or
+logic_or    -> logic_and ( "or" logic_and )*
+logic_and   -> logic_not ( "and" logic_not )*
+logic_not   -> "not" logic_not | comparison
+comparison  -> term ( ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) term )*
+term        -> factor ( ( "+" | "-" ) factor )*
+factor      -> unary ( ( "*" | "/" ) unary )*
+unary       -> "-" unary | exponent
+exponent    -> primary ( "^" unary )?
+primary     -> NUMBER | FLOAT | STRING | "true" | "false" | "null"
+             | IDENTIFIER | "(" expression ")"
 ```
+
+Precedence, lowest to highest: `or`, `and`, `not`, comparisons, `+ -`, `* /`, unary `-`, `^`. All binary operators are left-associative except `^`, which is right-associative (`2^3^2` is `2^(3^2)`). Unary `-` binds looser than `^`, so `-2^2` is `-(2^2)`.
+
+Newline rules:
+- A top-level statement ends at a NEWLINE (or end of file). Blank lines produce no NEWLINE token.
+- Inside `( )` newlines are ignored, so an expression or attribute list can span lines.
+- A line ending in a binary operator (or `=` of an assignment) continues on the next line.
+- Inside an element body `{ }`, newlines separate children, but children may also share a line.
+
+Statement notes:
+- `assignment` is chosen when a line starts with `IDENTIFIER "="`. `=` is not an expression operator, so assignment cannot appear inside an expression or be chained.
+- `print` requires its parentheses; `print x` and `print()` are parse errors.
 
 ## Parse output format
 
