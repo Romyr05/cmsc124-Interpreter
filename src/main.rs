@@ -112,6 +112,7 @@ fn parse_file(path: &str) -> Result<(), CliError> {
             TopLevel::Let {
                 name, initializer, ..
             } => println!("{}", print_let(name, initializer.as_ref())),
+            TopLevel::Print(expr) => println!("(print {})", print_expr(expr)),
         }
     }
     Ok(())

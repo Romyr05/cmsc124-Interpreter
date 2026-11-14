@@ -29,6 +29,8 @@ pub enum TopLevel<'a> {
         initializer: Option<Expr<'a>>,
         line: usize,
     },
+    // print(expression): writes the value to the terminal, never into HTML
+    Print(Expr<'a>),
 }
 
 impl<'a> Parser<'a> {
@@ -425,6 +427,8 @@ impl<'a> Parser<'a> {
             TopLevel::Element(self.element()?)
         } else if self.consume_on_type(&[TokenType::Initialize]) {
             self.let_declaration()?
+        } else if self.consume_on_type(&[TokenType::Print]) {
+            self.print_statement()?
         } else {
             TopLevel::Expr(self.expression()?)
         };
@@ -453,6 +457,15 @@ impl<'a> Parser<'a> {
             initializer,
             line: name.line,
         })
+    }
+
+    // print ( expression )   (the `print` was already consumed)
+    // `print x` fails at '(', `print()` fails in expression(), a missing ')' fails at ')'
+    fn print_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        self.expect(TokenType::LeftParen, "Expected '(' after 'print'")?;
+        let expr = self.expression()?;
+        self.expect(TokenType::RightParen, "Expected ')' after print value")?;
+        Ok(TopLevel::Print(expr))
     }
 
     // error recovery: discard tokens up to and including the next newline,

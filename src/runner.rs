@@ -45,6 +45,11 @@ pub fn run_source(source: &str, env: &mut Environment, first_line: usize) -> Res
                 Ok(html) => println!("{}", html),
                 Err(err) => return Err(CliError::Runtime(err.to_string())),
             },
+            // print writes the value to the terminal
+            TopLevel::Print(expr) => match env.evaluate(expr) {
+                Ok(value) => println!("{}", stringify(&value)),
+                Err(err) => return Err(CliError::Runtime(err.to_string())),
+            },
             // a declaration prints nothing; on error the table is left as it was
             TopLevel::Let {
                 name,
