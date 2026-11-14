@@ -346,6 +346,8 @@ impl<'a> Parser<'a> {
         while !self.is_type(TokenType::RightBrace) && !self.is_at_end() {
             if is_element_keyword(self.peek().token_type) {
                 children.push(TopLevel::Element(self.element()?));
+            } else if self.consume_on_type(&[TokenType::Print]) {
+                children.push(self.print_statement()?);
             } else {
                 children.push(TopLevel::Expr(self.expression()?));
             }
