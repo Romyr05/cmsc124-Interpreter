@@ -233,7 +233,9 @@ and later expressions produce no output.
 - Lookup: a name is searched from the innermost scope outward; the first match wins.
 - Errors in a body: the body's scope is still discarded, so the REPL continues at the global scope.
 - Visibility: a binding can be used on any line after its `let` (including element bodies and later REPL lines), never before.
-- Types: dynamic. A variable has no fixed type; assignment may give it a value of any type (`let x = 5` then `x = "hi"` is allowed; assignment: #63).
+- Types: dynamic. A variable has no fixed type; assignment may give it a value of any type (`let x = 5` then `x = "hi"` is allowed).
+- Assignment: `name = expression` on its own line, a statement, not an expression. It evaluates the value, then updates the nearest scope (innermost outward) that already has `name`; an assignment inside an element body can update an outer binding. It never creates a binding, and it prints nothing.
+- Assignment errors: an unknown name is a runtime error (exit 70): `Undefined variable 'name'.` A target that isn't a plain name (`(1 + 2) = 3`) is a parse error (exit 65): `Invalid assignment target.` Chained assignment (`a = b = 3`) and assignment used as a value (`let y = (x = 5)`) are parse errors (exit 65).
 - Redeclaration in the same scope: an error. `let x = 1` then `let x = 2` is a runtime error (exit 70): `Variable 'x' already declared.`
 - Uninitialized variable holds: nothing. `let x` has no value until its first assignment; reading it first is a runtime error (exit 70): `Variable 'x' used before assignment.`
 - Shadowing: allowed across scopes. An inner `let x` hides an outer `x` inside that body without changing it; after the body ends, the outer `x` is visible again with its old value.
