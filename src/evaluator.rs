@@ -1,7 +1,9 @@
 // Tree-walking evaluator: walks an Expr and produces a runtime Value.
 // Post-order traversal: each node evaluates its children before itself.
 use crate::ast::{Expr, Value};
+use crate::code_generator::generate;
 use crate::errors::RuntimeError;
+use crate::parser::TopLevel;
 use crate::token_types::{Token, TokenType};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -59,6 +61,38 @@ impl Environment {
             // no parent left = searched every scope without finding it
             scope = parent?;
         }
+    }
+
+    // run one statement. Shared by the runner (top level), element bodies, and
+    // control-flow bodies, so each statement's rule is written once.
+    // print_values: print a bare expression's value (--eval, REPL) or discard it (plain ./run)
+    pub fn execute(&mut self, stmt: &TopLevel, print_values: bool) -> Result<(), RuntimeError> {
+        match stmt {
+            // always evaluated (so errors still surface); the value is printed only if asked
+            TopLevel::Expr(expr) => {
+                let value = self.evaluate(expr)?;
+                if print_values {
+                    println!("{}", stringify(&value));
+                }
+            }
+            // a top-level element: its HTML is printed once the whole element is built
+            TopLevel::Element(element) => println!("{}", generate(element, self)?),
+            // print writes the value to the terminal
+            // If it catches this it just prints tha value to the terminal and no replacing it as html
+            // Makes it the appropriate value to be shown
+            // (inside an element: goes straight to the terminal, never into the HTML,
+            // so its line appears before the element's HTML is printed)
+            TopLevel::Print(expr) => println!("{}", stringify(&self.evaluate(expr)?)),
+            // a declaration prints nothing; on error the table is left as it was
+            TopLevel::Let {
+                name,
+                initializer,
+                line,
+            } => self.declare(name, initializer.as_ref(), *line)?,
+            // an assignment prints nothing, like a declaration
+            TopLevel::Assign { name, value, line } => self.assign(name, value, *line)?,
+        }
+        Ok(())
     }
 
     // let name = initializer   (or just `let name`, which stores no value)

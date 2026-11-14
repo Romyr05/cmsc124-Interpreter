@@ -25,18 +25,12 @@ fn append_children(
                     }
                 }
                 TopLevel::Element(element) => append_element(element, body, env)?,
-                // print goes straight to the terminal, never into body (the HTML),
-                // so its line appears before the element's HTML is printed
+                // every other child is a statement (print, let, assignment), run by the
+                // shared executor in this body's scope. print goes straight to the
+                // terminal, never into body (the HTML), so its line appears before the
+                // element's HTML is printed
                 // For the terminal side; makes it a
-                TopLevel::Print(expr) => println!("{}", stringify(&env.evaluate(expr)?)),
-                // a let inside a body declares in this body's scope
-                TopLevel::Let {
-                    name,
-                    initializer,
-                    line,
-                } => env.declare(name, initializer.as_ref(), *line)?,
-                // an assignment in a body may update a binding from an outer scope
-                TopLevel::Assign { name, value, line } => env.assign(name, value, *line)?,
+                statement => env.execute(statement, false)?,
             }
         }
         Ok(())
