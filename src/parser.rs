@@ -345,6 +345,11 @@ impl<'a> Parser<'a> {
         self.expect(TokenType::LeftBrace, "Expected '{' to start element body")?;
         let mut children = Vec::new();
         while !self.is_type(TokenType::RightBrace) && !self.is_at_end() {
+            // newlines inside a body separate children; blank lines are skipped,
+            // and children may also share a line
+            if self.consume_on_type(&[TokenType::Newline]) {
+                continue;
+            }
             if is_element_keyword(self.peek().token_type) {
                 children.push(TopLevel::Element(self.element()?));
             } else if self.consume_on_type(&[TokenType::Print]) {
