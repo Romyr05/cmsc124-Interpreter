@@ -52,6 +52,7 @@ pub fn print_element(element: &Element) -> String {
                 name, initializer, ..
             } => print_let(name, initializer.as_ref()),
             TopLevel::Print(e) => format!("(print {})", print_expr(e)),
+            TopLevel::Assign { name, value, .. } => format!("(= {} {})", name, print_expr(value)),
         });
     }
 

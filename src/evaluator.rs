@@ -86,6 +86,34 @@ impl Environment {
         Ok(())
     }
 
+    // name = value: evaluate first (an error leaves every scope untouched), then
+    // update the nearest scope, innermost outward, that already has the name.
+    // Never creates a binding; the new value may be a different type.
+    pub fn assign(&mut self, name: &str, value: &Expr, line: usize) -> Result<(), RuntimeError> {
+        let value = self.evaluate(value)?;
+        let mut scope = Rc::clone(&self.current);
+        loop {
+            let parent = {
+                let mut s = scope.borrow_mut();
+                if let Some(slot) = s.values.get_mut(name) {
+                    *slot = Some(value);
+                    return Ok(());
+                }
+                s.parent.clone()
+            };
+            match parent {
+                Some(p) => scope = p,
+                // searched every scope: assignment must not create the name
+                None => {
+                    return Err(RuntimeError {
+                        line,
+                        message: format!("Undefined variable '{}'.", name),
+                    });
+                }
+            }
+        }
+    }
+
     // the one entry point: ask what node this is and do the matching thing
     pub fn evaluate(&self, expr: &Expr) -> Result<Value, RuntimeError> {
         match expr {

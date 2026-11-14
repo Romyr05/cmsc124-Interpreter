@@ -73,6 +73,12 @@ pub fn run_source(
                     return Err(CliError::Runtime(err.to_string()));
                 }
             }
+            // an assignment prints nothing, like a declaration
+            TopLevel::Assign { name, value, line } => {
+                if let Err(err) = env.assign(name, value, *line) {
+                    return Err(CliError::Runtime(err.to_string()));
+                }
+            }
         }
     }
     Ok(())

@@ -34,6 +34,12 @@ pub enum TopLevel<'a> {
     },
     // print(expression): writes the value to the terminal, never into HTML
     Print(Expr<'a>),
+    // name = value: updates the nearest existing binding; line points at the name
+    Assign {
+        name: String,
+        value: Expr<'a>,
+        line: usize,
+    },
 }
 
 impl<'a> Parser<'a> {
@@ -49,6 +55,11 @@ impl<'a> Parser<'a> {
 
     fn peek(&self) -> &Token<'a> {
         &self.tokens[self.current]
+    }
+
+    // one token past peek(); the token list always ends with Eof, so clamp to it
+    fn peek_next(&self) -> &Token<'a> {
+        &self.tokens[(self.current + 1).min(self.tokens.len() - 1)]
     }
 
     fn previous(&self) -> &Token<'a> {
@@ -106,25 +117,10 @@ impl<'a> Parser<'a> {
     // Every rule returns Expr<'a> so the result borrows from the source
     // text ('a), NOT from the &mut self borrow.
 
+    // assignment is a statement (see assignment_statement), so `=` is not part of
+    // the expression grammar: `let y = (x = 5)` is a parse error
     fn expression(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        self.assignment()
-    }
-
-    // =
-    fn assignment(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
-        let mut node = self.logic_or()?;
-
-        while self.consume_on_type(&[TokenType::Equal]) {
-            let operator = *self.previous();
-            self.skip_newlines();
-            let right = self.logic_or()?;
-            node = Expr::Binary {
-                left: Box::new(node),
-                operator,
-                right: Box::new(right),
-            };
-        }
-        Ok(node)
+        self.logic_or()
     }
 
     fn logic_and(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
@@ -382,8 +378,10 @@ impl<'a> Parser<'a> {
             self.let_declaration()
         } else if self.consume_on_type(&[TokenType::Print]) {
             self.print_statement()
+        } else if self.is_at_assignment() {
+            self.assignment_statement()
         } else {
-            Ok(TopLevel::Expr(self.expression()?))
+            self.expression_statement()
         }
     }
 
@@ -458,8 +456,10 @@ impl<'a> Parser<'a> {
             // When printing is found
         } else if self.consume_on_type(&[TokenType::Print]) {
             self.print_statement()?
+        } else if self.is_at_assignment() {
+            self.assignment_statement()?
         } else {
-            TopLevel::Expr(self.expression()?)
+            self.expression_statement()?
         };
 
         // the terminator check, shared by both branches; consumes the newline
@@ -486,6 +486,45 @@ impl<'a> Parser<'a> {
             initializer,
             line: name.line,
         })
+    }
+
+    // an assignment starts with a name followed by '='
+    fn is_at_assignment(&self) -> bool {
+        self.peek().token_type == TokenType::Identifier
+            && self.peek_next().token_type == TokenType::Equal
+    }
+
+    // NAME = expression   (nothing consumed yet; is_at_assignment checked the first two tokens)
+    fn assignment_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        let name = *self.advance();
+        self.advance(); // the '='
+        self.skip_newlines(); // a line may end right after '=', like after an operator
+        let value = self.expression()?;
+        // `a = b = 3`: the value was `b`, and another '=' follows
+        if self.is_type(TokenType::Equal) {
+            return Err(ParseError {
+                token: *self.peek(),
+                message: "Assignment is a statement and can't be chained.".to_string(),
+            });
+        }
+        Ok(TopLevel::Assign {
+            name: name.lexeme.to_string(),
+            value,
+            line: name.line,
+        })
+    }
+
+    // a bare expression on its own; a '=' right after it means the left side
+    // wasn't a plain name, e.g. `(1 + 2) = 3`
+    fn expression_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        let expr = self.expression()?;
+        if self.is_type(TokenType::Equal) {
+            return Err(ParseError {
+                token: *self.peek(),
+                message: "Invalid assignment target.".to_string(),
+            });
+        }
+        Ok(TopLevel::Expr(expr))
     }
 
     // print ( expression )   (the `print` was already consumed)

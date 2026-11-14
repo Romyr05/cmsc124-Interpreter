@@ -125,6 +125,10 @@ fn parse_file(path: &str) -> Result<(), CliError> {
                 name, initializer, ..
             } => println!("{}", print_let(name, initializer.as_ref())),
             TopLevel::Print(expr) => println!("(print {})", print_expr(expr)),
+            // same (= x value) form as the Lab 2 tree output
+            TopLevel::Assign { name, value, .. } => {
+                println!("(= {} {})", name, print_expr(value))
+            }
         }
     }
     Ok(())

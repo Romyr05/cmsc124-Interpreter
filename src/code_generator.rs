@@ -35,6 +35,8 @@ fn append_children(
                     initializer,
                     line,
                 } => env.declare(name, initializer.as_ref(), *line)?,
+                // an assignment in a body may update a binding from an outer scope
+                TopLevel::Assign { name, value, line } => env.assign(name, value, *line)?,
             }
         }
         Ok(())
