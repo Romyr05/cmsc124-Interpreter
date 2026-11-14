@@ -103,6 +103,13 @@ impl Environment {
                     self.execute_block(branch, print_values)?;
                 }
             }
+            // check, run the body, check again; a falsey first check runs it zero times.
+            // execute_block makes a fresh scope on every iteration
+            TopLevel::While { condition, body } => {
+                while is_truthy(&self.evaluate(condition)?) {
+                    self.execute_block(body, print_values)?;
+                }
+            }
         }
         Ok(())
     }

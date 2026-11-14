@@ -289,6 +289,7 @@ and later expressions produce no output.
 - `else` goes on the same line as the closing `}` (`} else {`), because the newline after `}` ends the `if` statement.
 - Each branch body is its own scope, like an element body: a `let` inside it disappears when the branch ends, and assignment can update outer bindings.
 - Branch bodies hold statements only (`let`, assignment, `print`, `if`, bare expressions); an element inside one is a parse error (exit 65). An `if` may appear inside an element body.
+- `while (condition) { ... }`: checks the condition, runs the body if truthy, and checks again. A falsey first check runs the body zero times. Assignment in the body updates the outer binding, which is how a loop ends. Each iteration gets a fresh body scope, so a `let` inside the body is new every time (no redeclaration error) and is gone after the loop. There is no `for` loop yet.
 - Logical operators return: [booleans, or the operand]
 - Dangling else binds to: the nearest `if`. With required braces the question only arises through `else if`, which always belongs to the `if` just before it.
 - Closure capture of a loop variable: [per iteration, or shared]

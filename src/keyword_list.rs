@@ -7,6 +7,7 @@ pub fn keywords_lookup(word: &str) -> TokenType {
         "print" => TokenType::Print,
         "if" => TokenType::If,
         "else" => TokenType::Else,
+        "while" => TokenType::While,
         "button" => TokenType::Button,
         "box" => TokenType::Box,
         "text" => TokenType::Text,

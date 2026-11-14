@@ -34,6 +34,7 @@ pub enum TokenType {
     Print,
     If,
     Else,
+    While,
     Button,
     Box,
     Text,

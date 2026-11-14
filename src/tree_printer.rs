@@ -78,6 +78,14 @@ pub fn print_statement(item: &TopLevel<'_>) -> String {
             }
             format!("({})", parts.join(" "))
         }
+        // (while cond (body s1 s2))
+        TopLevel::While { condition, body } => {
+            format!(
+                "(while {} {})",
+                print_expr(condition),
+                print_block("body", body)
+            )
+        }
     }
 }
 

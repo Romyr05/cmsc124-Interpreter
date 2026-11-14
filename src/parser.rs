@@ -47,6 +47,11 @@ pub enum TopLevel<'a> {
         then_branch: Vec<TopLevel<'a>>,
         else_branch: Option<Vec<TopLevel<'a>>>,
     },
+    // while (condition) { body }
+    While {
+        condition: Expr<'a>,
+        body: Vec<TopLevel<'a>>,
+    },
 }
 
 impl<'a> Parser<'a> {
@@ -363,7 +368,7 @@ impl<'a> Parser<'a> {
     // { children }: shared by element bodies and if/else bodies.
     // Newlines separate children; blank lines are skipped, and children may also
     // share a line. A bad child is recorded and skipped; the rest keeps parsing.
-    // `what` names the body in error messages ("element", "if", "else").
+    // `what` names the body in error messages ("element", "if", "else", "while").
     fn body(
         &mut self,
         allow_elements: bool,
@@ -419,6 +424,15 @@ impl<'a> Parser<'a> {
         })
     }
 
+    // while ( expression ) { statements }   (the `while` was already consumed)
+    fn while_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        self.expect(TokenType::LeftParen, "Expected '(' after 'while'")?;
+        let condition = self.expression()?;
+        self.expect(TokenType::RightParen, "Expected ')' after while condition")?;
+        let body = self.body(false, "while")?;
+        Ok(TopLevel::While { condition, body })
+    }
+
     // one child of an element body: a nested element, a let, a print, or an expression
     // (also if/else bodies, which pass allow_elements = false: statements only)
     fn body_child(&mut self, allow_elements: bool) -> Result<TopLevel<'a>, ParseError<'a>> {
@@ -432,6 +446,8 @@ impl<'a> Parser<'a> {
             Ok(TopLevel::Element(self.element()?))
         } else if self.consume_on_type(&[TokenType::If]) {
             self.if_statement()
+        } else if self.consume_on_type(&[TokenType::While]) {
+            self.while_statement()
         } else if self.consume_on_type(&[TokenType::Initialize]) {
             self.let_declaration()
         } else if self.consume_on_type(&[TokenType::Print]) {
@@ -516,6 +532,8 @@ impl<'a> Parser<'a> {
             self.print_statement()?
         } else if self.consume_on_type(&[TokenType::If]) {
             self.if_statement()?
+        } else if self.consume_on_type(&[TokenType::While]) {
+            self.while_statement()?
         } else if self.is_at_assignment() {
             self.assignment_statement()?
         } else {
