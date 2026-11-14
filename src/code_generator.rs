@@ -12,6 +12,7 @@ fn append_children(
 ) -> Result<(), RuntimeError> {
     // the body is its own scope: created before the children run, and the outer
     // scope is restored afterward, even if a child fails
+    // closure
     env.in_new_scope(|env| {
         for child in &element.children {
             match child {

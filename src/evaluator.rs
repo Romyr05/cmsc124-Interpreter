@@ -10,7 +10,8 @@ use std::rc::Rc;
 // one scope: its own bindings (name -> value) plus a link to the scope around it.
 // None = declared with `let x` but not given a value yet.
 // parent is None for the global scope.
-// Rc<RefCell<..>> = shared ownership + mutation checked at runtime (closures need this, Lab 5)
+// Rc<RefCell<..>> = shared ownership + mutation checked at runtime
+// For reference and chainging the ownership and can mutate at runtime
 #[derive(Default)]
 struct Scope {
     values: HashMap<String, Option<Value>>,
@@ -19,6 +20,7 @@ struct Scope {
 
 // the interpreter's state: the scope code is currently running in.
 // created once per file run / REPL session, so global bindings survive between lines
+// used for the reference cell scope to see where it is currently ( inner and whatnot)
 #[derive(Default)]
 pub struct Environment {
     current: Rc<RefCell<Scope>>,
@@ -30,7 +32,7 @@ impl Environment {
     // so after an error the REPL is back at the scope it started in.
     pub fn in_new_scope(
         &mut self,
-        work: impl FnOnce(&mut Environment) -> Result<(), RuntimeError>,
+        work: impl FnOnce(&mut Environment) -> Result<(), RuntimeError>, // called only once to get what is the thing inside the inner
     ) -> Result<(), RuntimeError> {
         let outer = Rc::clone(&self.current);
         self.current = Rc::new(RefCell::new(Scope {
