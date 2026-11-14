@@ -146,10 +146,18 @@ changelog.]
 ```
 program     -> ( statement ( NEWLINE | EOF ) )* EOF
 statement   -> element
+             | ifStmt
+             | whileStmt
              | letDecl
              | printStmt
              | assignment
              | exprStmt
+
+ifStmt      -> "if" "(" expression ")" block
+               ( "else" ( ifStmt | block ) )?
+whileStmt   -> "while" "(" expression ")" block
+block       -> "{" ( blockStmt | NEWLINE )* "}"
+blockStmt   -> ifStmt | whileStmt | letDecl | printStmt | assignment | exprStmt
 
 letDecl     -> "let" IDENTIFIER ( "=" expression )?
 printStmt   -> "print" "(" expression ")"
@@ -163,7 +171,8 @@ attribute   -> ATTRIBUTE "=" expression
 ATTRIBUTE   -> "id" | "class" | "align" | "padding" | "margin"
              | "height" | "width" | "color" | "border"
 body        -> ( child | NEWLINE )*
-child       -> element | letDecl | printStmt | assignment | exprStmt
+child       -> element | ifStmt | whileStmt | letDecl | printStmt
+             | assignment | exprStmt
 
 expression  -> logic_or
 logic_or    -> logic_and ( "or" logic_and )*
@@ -184,7 +193,8 @@ Newline rules:
 - A top-level statement ends at a NEWLINE (or end of file). Blank lines produce no NEWLINE token.
 - Inside `( )` newlines are ignored, so an expression or attribute list can span lines.
 - A line ending in a binary operator (or `=` of an assignment) continues on the next line.
-- Inside an element body `{ }`, newlines separate children, but children may also share a line.
+- Inside an element body or an `if`/`while` block `{ }`, newlines separate statements, but statements may also share a line.
+- `else` must follow the closing `}` on the same line (`} else {`).
 
 Statement notes:
 - `assignment` is chosen when a line starts with `IDENTIFIER "="`. `=` is not an expression operator, so assignment cannot appear inside an expression or be chained.
