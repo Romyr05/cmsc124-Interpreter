@@ -179,6 +179,23 @@ Numbers are all `f64` (one numeric type, dynamically typed).
 - Nil: `nil`.
 - Strings: without quotes, so `"hi"` prints `hi`.
 
+### print
+
+- Syntax: `print(expression)` on its own line. Parentheses are required: `print x`, `print()`, and a missing `)` are parse errors (exit 65).
+- Output: the value is written to the terminal (stdout) using the rules above. It never becomes part of the generated HTML; page content comes from elements such as `text()`.
+- Allowed at top level and inside element bodies.
+- Ordering: inside an element, `print` runs immediately while the element is being built, but the element's HTML is printed only when the top-level element finishes. So the `print` line appears before that element's HTML:
+
+  ```
+  let x = 7
+  div() {
+    text() { "page" }
+    print(x)
+  }
+  ```
+  prints `7`, then the `<div>` HTML.
+- `--parse` shows it as `(print <expr>)`.
+
 ### Truthiness
 
 Only `false` and `null` are falsey. Numbers (including `0`) and strings
