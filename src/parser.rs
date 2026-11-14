@@ -57,9 +57,9 @@ impl<'a> Parser<'a> {
         &self.tokens[self.current]
     }
 
-    // one token past peek(); the token list always ends with Eof, so clamp to it
+    // one token past peek()
     fn peek_next(&self) -> &Token<'a> {
-        &self.tokens[(self.current + 1).min(self.tokens.len() - 1)]
+        &self.tokens[(self.current + 1).min(self.tokens.len() - 1)] // .min for boundary checking to not pass its len no.
     }
 
     fn previous(&self) -> &Token<'a> {
@@ -117,7 +117,7 @@ impl<'a> Parser<'a> {
     // Every rule returns Expr<'a> so the result borrows from the source
     // text ('a), NOT from the &mut self borrow.
 
-    // assignment is a statement (see assignment_statement), so `=` is not part of
+    // assignment is a statement; which is our decisin  , so `=` is not part of
     // the expression grammar: `let y = (x = 5)` is a parse error
     fn expression(&mut self) -> Result<Expr<'a>, ParseError<'a>> {
         self.logic_or()
@@ -379,9 +379,9 @@ impl<'a> Parser<'a> {
         } else if self.consume_on_type(&[TokenType::Print]) {
             self.print_statement()
         } else if self.is_at_assignment() {
-            self.assignment_statement()
+            self.assignment_statement() // for those identifier followed by =
         } else {
-            self.expression_statement()
+            self.expression_statement() // next to identifier is an not = 
         }
     }
 
