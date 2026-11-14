@@ -21,11 +21,13 @@ A domain-specific-language (DSL) designed for GUI-construction based around comp
 
 | Command | What it does |
 |---|---|
-| `./run <file>` | [Executes a program. Available from Lab 4.] |
+| `./run <file>` | Runs a program. Only `print()` and top-level elements produce output; bare expression values are evaluated and discarded. |
 | `./run --tokenize <file>` | [Prints the token stream.] |
 | `./run --parse <file>` | [Prints the parsed tree.] |
-| `./run --eval <file>` | [Evaluates each expression and prints its value.] |
-| `./run` | [Starts the REPL.] |
+| `./run --eval <file>` | Runs a program like `./run <file>`, but also prints each bare expression's value. |
+| `./run` | Starts the REPL; bare expression values are printed. |
+
+Every mode checks the whole source for scan/parse errors (65) before running anything.
 
 
 Exit codes: 0 [when successful], 65 [when input invalid], 70 [when system error].
