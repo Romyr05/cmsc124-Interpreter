@@ -19,7 +19,7 @@ pub struct Parser<'a> {
 }
 
 #[derive(Debug)]
-    //This just basically means a statemetn
+//This just basically means a statemetn
 pub enum TopLevel<'a> {
     Expr(Expr<'a>),
     Element(Element<'a>),

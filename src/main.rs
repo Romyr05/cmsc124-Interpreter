@@ -79,6 +79,7 @@ fn eval_file(path: &str) -> Result<(), CliError> {
     let source = fs::read_to_string(path)?;
     // one environment for the whole file
     let mut env = Environment::default();
+    //true print values since it prints the values
     run_source(&source, &mut env, 1, true)
 }
 
@@ -87,6 +88,7 @@ fn eval_file(path: &str) -> Result<(), CliError> {
 fn run_file(path: &str) -> Result<(), CliError> {
     let source = fs::read_to_string(path)?;
     let mut env = Environment::default();
+    // false print_values since running a file needs a print() statement
     run_source(&source, &mut env, 1, false)
 }
 

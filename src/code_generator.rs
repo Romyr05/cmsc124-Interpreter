@@ -23,7 +23,7 @@ fn append_children(
             TopLevel::Element(element) => append_element(element, body, env)?,
             // print goes straight to the terminal, never into body (the HTML),
             // so its line appears before the element's HTML is printed
-            // For the terminal side; makes it a 
+            // For the terminal side; makes it a
             TopLevel::Print(expr) => println!("{}", stringify(&env.evaluate(expr)?)),
             // the parser never puts a let inside an element body
             TopLevel::Let { line, .. } => {

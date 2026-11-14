@@ -30,6 +30,7 @@ pub fn run() -> io::Result<()> {
 // evaluate one line of input and print the value, or an error, then return to the prompt
 // the same scan/parse/run path as file mode (runner.rs); errors are reported, not fatal
 fn eval_line(src: &str, env: &mut Environment, line: usize) {
+    // True print_values since no need to use print()
     if let Err(err) = run_source(src, env, line, true) {
         eprintln!("{}", err);
     }
