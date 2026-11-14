@@ -127,10 +127,10 @@ Exit codes: 0 [when successful], 65 [when input invalid], 70 [when system error]
 
 ## Whitespace and termination
 
-- Whitespace significant: [yes or no, and where]
-- Statement terminator: [e.g. semicolon, newline, none]
-- Block delimiters: [e.g. braces, indentation]
-- Grouping delimiters: [e.g. parentheses]
+- Whitespace significant: only newlines. Spaces and indentation are ignored.
+- Statement terminator: newline, at top level and inside element bodies. Inside a body, children may also share one line (`div() { text() { "a" } text() { "b" } }`).
+- Block delimiters: braces `{ }` for element bodies. A newline inside braces still ends a line.
+- Grouping delimiters: parentheses `( )`. A newline inside parentheses is ignored, so an expression can continue across lines.
 
 ## Token output format
 
@@ -228,12 +228,15 @@ and later expressions produce no output.
 
 ### Scope and bindings
 
-- Declaration: `let name = expression`, or `let name` with no value yet. One global scope for now.
+- Declaration: `let name = expression`, or `let name` with no value yet. `let` creates the binding in the current scope.
+- Scopes: the file (or REPL session) is the global scope. Every element body `{ ... }` is a new scope nested inside the one around it, to any depth. Bindings declared in a body disappear when the body ends.
+- Lookup: a name is searched from the innermost scope outward; the first match wins.
+- Errors in a body: the body's scope is still discarded, so the REPL continues at the global scope.
 - Visibility: a binding can be used on any line after its `let` (including element bodies and later REPL lines), never before.
 - Types: dynamic. A variable has no fixed type; assignment may give it a value of any type (`let x = 5` then `x = "hi"` is allowed; assignment: #63).
 - Redeclaration in the same scope: an error. `let x = 1` then `let x = 2` is a runtime error (exit 70): `Variable 'x' already declared.`
 - Uninitialized variable holds: nothing. `let x` has no value until its first assignment; reading it first is a runtime error (exit 70): `Variable 'x' used before assignment.`
-- Shadowing: [behavior]
+- Shadowing: allowed across scopes. An inner `let x` hides an outer `x` inside that body without changing it; after the body ends, the outer `x` is visible again with its old value.
 - Undefined name: runtime error with exit 70: `[line N] Runtime error: Undefined variable 'name'.`
 
 ### Control flow and functions
