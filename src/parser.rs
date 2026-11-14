@@ -374,10 +374,12 @@ impl<'a> Parser<'a> {
         })
     }
 
-    // one child of an element body: a nested element, a print, or an expression
+    // one child of an element body: a nested element, a let, a print, or an expression
     fn body_child(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
         if is_element_keyword(self.peek().token_type) {
             Ok(TopLevel::Element(self.element()?))
+        } else if self.consume_on_type(&[TokenType::Initialize]) {
+            self.let_declaration()
         } else if self.consume_on_type(&[TokenType::Print]) {
             self.print_statement()
         } else {
