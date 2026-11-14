@@ -1,0 +1,2 @@
+div() {
+  print(1)      # expect error: Expected '}' to close element body

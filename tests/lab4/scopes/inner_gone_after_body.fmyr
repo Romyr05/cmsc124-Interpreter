@@ -1,0 +1,4 @@
+div() {
+  let temp = 1
+}               # expect: <!DOCTYPE html><html lang="html"><head></head><body><div></div></body></html>
+print(temp)     # expect runtime error: Undefined variable 'temp'.

@@ -1,0 +1,8 @@
+let a = "outer"
+div() {
+  let b = "middle"
+  div() {
+    print(a)    # expect: outer
+    print(b)    # expect: middle
+  }
+}               # expect: <!DOCTYPE html><html lang="html"><head></head><body><div><div></div></div></body></html>
