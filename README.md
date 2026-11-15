@@ -357,15 +357,41 @@ python3 run_tests.py tests/lab1
 
 ## Sample code
 
+Run [examples/scoped-button.fmyr](examples/scoped-button.fmyr) with:
+
+```bash
+./run examples/scoped-button.fmyr
 ```
-[a short program]
+
+```text
+let shade = "blue"
+div(color = shade) {
+  "Choose an action: "
+  let shade = "red"
+  button(color = shade) { "Submit" }
+}
+print(shade)
 ```
 
 Output:
 
+```html
+<!DOCTYPE html><html lang="html"><head></head><body><div style="color:blue;">Choose an action: <button style="color:red;">Submit</button></div></body></html>
+blue
 ```
-[its output]
-```
+
+The div's text is blue and the button's label is red. `color` sets the CSS text
+color, rather than the background. The div header reads the global `shade` before
+entering its body. The inner declaration supplies red to the button header; after
+the body ends, `print(shade)` still reads blue. The button is a static HTML control;
+click handlers are not implemented.
+
+`div`, `text`, `par`, and `button` generate HTML tags (`div`, `h1`, `p`, and
+`button`). Their `color` expressions are evaluated in the enclosing scope before
+the body runs, converted using the normal value-printing rules, and escaped for an
+HTML style attribute. Text content is also escaped. CSS interprets the resulting
+color value. Other attributes currently parse but do not affect generated HTML;
+`box` and `image` currently emit only their contents.
 
 ## Design rationale
 
