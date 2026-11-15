@@ -578,7 +578,6 @@ impl<'a> Parser<'a> {
         self.advance(); // the '='
         self.skip_newlines(); // a line may end right after '=', like after an operator
         let value = self.expression()?;
-        // `a = b = 3`: the value was `b`, and another '=' follows
         if self.is_type(TokenType::Equal) {
             return Err(ParseError {
                 token: *self.peek(),
@@ -605,8 +604,8 @@ impl<'a> Parser<'a> {
         Ok(TopLevel::Expr(expr))
     }
 
-    // print ( expression )   (the `print` was already consumed)
-    // `print x` fails at '(', `print()` fails in expression(), a missing ')' fails at ')'
+    // print ( expression )
+    // statemetn not an expression
     fn print_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
         self.expect(TokenType::LeftParen, "Expected '(' after 'print'")?;
         let expr = self.expression()?;

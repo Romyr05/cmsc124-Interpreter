@@ -1,9 +1,9 @@
-// Shared run path for file mode and the REPL:
-// scan -> parse the whole source -> run each item, printing values and HTML.
-// The caller owns the Environment (so the REPL keeps bindings between lines)
-// and decides what an error means (file: exit 65/70, REPL: print and continue).
-// first_line is the line number of the source's first line (file: 1, REPL: session line).
-// print_values: print bare expression values (--eval, REPL) or discard them (plain ./run).
+// Shared run path for file mode and the REPL since they do the same things again and again
+// This scans (Parse -> run each item -> print values and HTML)
+// Environment owned by caller (so repl keeps bindings between lines)
+// Print values and first line controlled by caller
+// Error handlings are the same for both modes.
+
 use crate::errors::CliError;
 use crate::evaluator::Environment;
 use crate::parser::Parser;

@@ -42,13 +42,15 @@ impl Environment {
             values: HashMap::new(),
             parent: Some(Rc::clone(&outer)),
         }));
-        let result = work(self);
+        let result = work(self); //basically mean execute_body for this we execute it 
         self.current = outer;
         result
     }
 
     // search from the current scope outward; the innermost scope that has the name wins
     // outer None = no scope has it; inner None = declared but no value yet
+
+    //CHceks current scope values and then if not found it checks the parent
     fn lookup(&self, name: &str) -> Option<Option<Value>> {
         let mut scope = Rc::clone(&self.current);
         loop {
@@ -72,6 +74,8 @@ impl Environment {
             // always evaluated (so errors still surface); the value is printed only if asked
             TopLevel::Expr(expr) => {
                 let value = self.evaluate(expr)?;
+
+                // If false needs to have a print otherwise no need na
                 if print_values {
                     println!("{}", stringify(&value));
                 }
@@ -81,8 +85,6 @@ impl Environment {
             // print writes the value to the terminal
             // If it catches this it just prints tha value to the terminal and no replacing it as html
             // Makes it the appropriate value to be shown
-            // (inside an element: goes straight to the terminal, never into the HTML,
-            // so its line appears before the element's HTML is printed)
             TopLevel::Print(expr) => println!("{}", stringify(&self.evaluate(expr)?)),
             // a declaration prints nothing; on error the table is left as it was
             TopLevel::Let {
@@ -116,6 +118,7 @@ impl Environment {
     }
 
     // run a control-flow body in its own scope (restored even if a statement fails)
+    // executes each statemetns and using in_newscope so we go back to the outer scope and restoring it (current scope)
     fn execute_block(
         &mut self,
         stmts: &[TopLevel],
@@ -129,9 +132,8 @@ impl Environment {
         })
     }
 
-    // let name = initializer   (or just `let name`, which stores no value)
-    // evaluate first: if that fails we return early and the table is untouched
-    // then check for redeclaration, then store
+    // checks whether the name already exists in the current scope only. It doesn’t check the outer scopes
+    // Evaluates first and then if fails return early
     pub fn declare(
         &mut self,
         name: &str,
@@ -154,11 +156,13 @@ impl Environment {
         Ok(())
     }
 
+    // computes the new value, then searches for an existing binding to update.
+    // starts in the current scope and moves outward if necessary
     // name = value: evaluate first (an error leaves every scope untouched), then
     // update the nearest scope, innermost outward, that already has the name.
     // Never creates a binding; the new value may be a different type.
     pub fn assign(&mut self, name: &str, value: &Expr, line: usize) -> Result<(), RuntimeError> {
-        let value = self.evaluate(value)?;
+        let value = self.evaluate(value)?; // Evaluates right hand side first 
         let mut scope = Rc::clone(&self.current);
         loop {
             let parent = {
@@ -167,7 +171,7 @@ impl Environment {
                     *slot = Some(value);
                     return Ok(());
                 }
-                s.parent.clone()
+                s.parent.clone() // follow parent (outer scope) if not found
             };
             match parent {
                 Some(p) => scope = p,
