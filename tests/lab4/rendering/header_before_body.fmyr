@@ -1,0 +1,6 @@
+let shade = "blue"
+text(color = shade) {
+  let shade = "red"
+  shade
+} # expect: <!DOCTYPE html><html lang="html"><head></head><body><h1 style="color:blue;">red</h1></body></html>
+par(color = "green") { "Done" } # expect: <!DOCTYPE html><html lang="html"><head></head><body><p style="color:green;">Done</p></body></html>

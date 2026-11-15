@@ -1,0 +1,6 @@
+let shade = "blue"
+div(color = shade) {
+  let shade = "red"
+  button(color = shade) { "Submit" }
+} # expect: <!DOCTYPE html><html lang="html"><head></head><body><div style="color:blue;"><button style="color:red;">Submit</button></div></body></html>
+print(shade) # expect: blue
