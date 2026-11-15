@@ -1,0 +1,4 @@
+let value = null
+print(value) # expect: null
+value = "ready"
+print(value) # expect: ready
