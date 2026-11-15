@@ -1,0 +1,3 @@
+let count = 0
+div() { count = 2 div() { print(missing) } } # expect runtime diagnostic: Undefined variable 'missing'.
+count # expect value: 2

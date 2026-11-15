@@ -1,0 +1,4 @@
+let saved = 8
+let fresh = 1 print 2 # expect syntax diagnostic: Expected newline after expression
+fresh # expect runtime diagnostic: Undefined variable 'fresh'.
+saved # expect value: 8

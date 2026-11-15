@@ -1,0 +1,7 @@
+print("must not run")
+div() {
+  let = 1 # expect error: Expected variable name after 'let'
+  div() { print 2 } # expect error: Expected '(' after 'print'
+  print() # expect error: Expected expression
+}
+print 3 # expect error: Expected '(' after 'print'

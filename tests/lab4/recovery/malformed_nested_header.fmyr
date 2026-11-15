@@ -1,0 +1,7 @@
+div() {
+  if true { # expect error: Expected '(' after 'if'
+    print("must not run")
+  }
+  print 5 # expect error: Expected '(' after 'print'
+}
+print 6 # expect error: Expected '(' after 'print'

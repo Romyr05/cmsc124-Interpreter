@@ -1,0 +1,4 @@
+# Recovery intentionally uses multiple errors; no statement may execute.
+print("must not run")
+let = 1 # expect error: Expected variable name after 'let'
+print 2 # expect error: Expected '(' after 'print'

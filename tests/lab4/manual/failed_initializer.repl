@@ -1,0 +1,6 @@
+let saved = 8
+let fresh = missing # expect runtime diagnostic: Undefined variable 'missing'.
+fresh # expect runtime diagnostic: Undefined variable 'fresh'.
+let fresh = 9
+fresh # expect value: 9
+saved # expect value: 8
