@@ -1,0 +1,10 @@
+let count = 1
+div() {
+  let step = 2
+  div() {
+    count = count + step
+    print(count) # expect: 3
+  }
+  print(step) # expect: 2
+} # expect: <!DOCTYPE html><html lang="html"><head></head><body><div><div></div></div></body></html>
+print(count) # expect: 3

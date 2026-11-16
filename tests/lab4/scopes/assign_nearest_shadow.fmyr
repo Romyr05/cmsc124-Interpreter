@@ -1,0 +1,8 @@
+let shade = "blue"
+div() {
+  let shade = "red"
+  print(shade) # expect: red
+  div() { shade = "green" }
+  print(shade) # expect: green
+} # expect: <!DOCTYPE html><html lang="html"><head></head><body><div><div></div></div></body></html>
+print(shade) # expect: blue

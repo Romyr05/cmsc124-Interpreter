@@ -42,24 +42,37 @@ fn append_element(
     body: &mut String,
     env: &mut Environment,
 ) -> Result<(), RuntimeError> {
-    match element.kind {
-        TokenType::Text => {
-            body.push_str("<h1>");
-            append_children(element, body, true, env)?;
-            body.push_str("</h1>");
+    let tag = match element.kind {
+        TokenType::Text => "h1",
+        TokenType::Paragraph => "p",
+        TokenType::Div => "div",
+        TokenType::Button => "button",
+        _ => return append_children(element, body, false, env),
+    };
+
+    body.push('<');
+    body.push_str(tag);
+    let mut style = String::new();
+    // Headers read the enclosing scope. A declaration in this element's body
+    // can affect a child's header, but cannot change this header retroactively.
+    for attribute in &element.attributes {
+        if attribute.kind == TokenType::StyleColor {
+            let value = stringify(&env.evaluate(&attribute.value)?);
+            style.push_str("color:");
+            style.push_str(&value);
+            style.push(';');
         }
-        TokenType::Paragraph => {
-            body.push_str("<p>");
-            append_children(element, body, true, env)?;
-            body.push_str("</p>");
-        }
-        TokenType::Div => {
-            body.push_str("<div>");
-            append_children(element, body, true, env)?;
-            body.push_str("</div>");
-        }
-        _ => append_children(element, body, false, env)?,
     }
+    if !style.is_empty() {
+        body.push_str(" style=\"");
+        body.push_str(&escape_html(&style));
+        body.push('"');
+    }
+    body.push('>');
+    append_children(element, body, true, env)?;
+    body.push_str("</");
+    body.push_str(tag);
+    body.push('>');
     Ok(())
 }
 

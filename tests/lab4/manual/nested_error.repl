@@ -1,0 +1,7 @@
+let shade = "blue"
+div() { let shade = "red" div() { print(missing) } } # expect runtime diagnostic: Undefined variable 'missing'.
+shade # expect value: blue
+shade = "green"
+shade # expect value: green
+let later = 7
+later # expect value: 7

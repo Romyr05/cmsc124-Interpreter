@@ -1,0 +1,2 @@
+print(later) # expect runtime error: Undefined variable 'later'.
+let later = 1

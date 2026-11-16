@@ -1,0 +1,10 @@
+# The div reads the global shade before entering its body.
+let shade = "blue"
+div(color = shade) {
+  "Choose an action: "
+  # This binding belongs to the div body; the button reads it.
+  let shade = "red"
+  button(color = shade) { "Submit" }
+}
+# The inner declaration leaves the global binding unchanged.
+print(shade)

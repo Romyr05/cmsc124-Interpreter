@@ -1,0 +1,4 @@
+div() { let temporary = 1 } # expect HTML: <!DOCTYPE html><html lang="html"><head></head><body><div></div></body></html>
+temporary # expect runtime diagnostic: Undefined variable 'temporary'.
+let temporary = 9
+temporary # expect value: 9

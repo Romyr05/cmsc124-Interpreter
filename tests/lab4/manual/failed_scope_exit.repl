@@ -1,0 +1,4 @@
+div() { let temporary = 1 print(missing) } # expect runtime diagnostic: Undefined variable 'missing'.
+temporary # expect runtime diagnostic: Undefined variable 'temporary'.
+let temporary = 9
+temporary # expect value: 9

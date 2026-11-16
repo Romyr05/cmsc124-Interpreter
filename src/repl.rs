@@ -13,7 +13,7 @@ pub fn run() -> io::Result<()> {
     loop {
         command.clear();
 
-        print!("> ");
+        print!("> "); // To look like python REPL
         io::stdout().flush()?;
 
         let bytes_read = stdin.read_line(&mut command)?;

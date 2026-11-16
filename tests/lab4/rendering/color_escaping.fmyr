@@ -1,0 +1,1 @@
+div(color = "red&<>'") { "label" } # expect: <!DOCTYPE html><html lang="html"><head></head><body><div style="color:red&amp;&lt;&gt;&#39;;">label</div></body></html>
