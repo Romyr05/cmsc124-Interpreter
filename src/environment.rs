@@ -3,8 +3,9 @@ use crate::code_generator::generate;
 use crate::errors::RuntimeError;
 use crate::evaluator::{is_truthy, stringify};
 use crate::parser::TopLevel;
+use crate::render;
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 // One scope: the bindings declared in this block. None means the name was
 // declared with `let x` but has not been assigned yet.
@@ -18,7 +19,6 @@ struct Scope {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Flow {
     Continue,
-    #[allow(dead_code)] // returned by render(), added in the next workstream
     Stop,
 }
 
@@ -29,9 +29,8 @@ pub enum Flow {
 // no runtime borrow checking and no manual parent restoration.
 pub struct Environment {
     scopes: Vec<Scope>,
-    // Source file being run. render() will use it to choose the sibling .html
+    // Source file being run. render() uses it to choose the sibling .html
     // output path; the REPL has no source file, so this stays None there.
-    #[allow(dead_code)] // read by render(), added in the next workstream
     source_path: Option<PathBuf>,
 }
 
@@ -52,6 +51,12 @@ impl Environment {
             scopes: vec![Scope::default()],
             source_path: Some(path.into()),
         }
+    }
+
+    // Render needs the source path to choose its sibling .html file, but file
+    // writing itself lives in render.rs.
+    pub(crate) fn source_path(&self) -> Option<&Path> {
+        self.source_path.as_deref()
     }
 
     // Run `work` in a new scope, then pop it. Popping happens whether `work`
@@ -98,6 +103,12 @@ impl Environment {
             // If it catches this it just prints tha value to the terminal and no replacing it as html
             // Makes it the appropriate value to be shown
             TopLevel::Print(expr) => println!("{}", stringify(&self.evaluate(expr)?)),
+            // render builds one document, writes it beside the source file, and
+            // ends interpretation by returning Flow::Stop.
+            TopLevel::Render { element, line } => {
+                render::render_element(element, self, *line)?;
+                return Ok(Flow::Stop);
+            }
             // a declaration prints nothing; on error the table is left as it was
             TopLevel::Let {
                 name,

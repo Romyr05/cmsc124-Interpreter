@@ -5,6 +5,7 @@ mod errors;
 mod evaluator;
 pub mod keyword_list;
 mod parser;
+mod render;
 mod repl;
 mod runner;
 mod scanner;
