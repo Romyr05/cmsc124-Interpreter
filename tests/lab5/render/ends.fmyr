@@ -1,0 +1,4 @@
+render(box() {
+  par() { "page" }
+})                # expect nothing
+print("after")

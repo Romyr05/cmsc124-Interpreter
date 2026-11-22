@@ -1,0 +1,2 @@
+render(box() {})
+render(box() {})  # expect error: Only one render() is allowed per file.

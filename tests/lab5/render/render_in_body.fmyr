@@ -1,0 +1,3 @@
+div() {
+  render(box() {})  # expect error: render() is only allowed at top level.
+}

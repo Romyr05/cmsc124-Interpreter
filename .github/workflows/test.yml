@@ -45,3 +45,10 @@ jobs:
 
       - name: Run Lab 5 tests
         run: python3 run_tests.py tests/lab5
+
+      - name: Verify rendered HTML
+        run: |
+          for expected in tests/lab5/render/*.expected.html; do
+            generated="${expected%.expected.html}.html"
+            diff -u "$expected" "$generated"
+          done
