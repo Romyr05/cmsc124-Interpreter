@@ -1,0 +1,4 @@
+if (true) {
+  let temporary = 1
+}
+print(temporary)  # expect runtime error: Undefined variable 'temporary'.
