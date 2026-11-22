@@ -4,8 +4,8 @@
 // Print values and first line controlled by caller
 // Error handlings are the same for both modes.
 
+use crate::environment::{Environment, Flow};
 use crate::errors::CliError;
-use crate::evaluator::Environment;
 use crate::parser::Parser;
 use crate::scanner::Tokenizer;
 
@@ -42,8 +42,13 @@ pub fn run_source(
     // run phase: the whole source is valid, stop at the first runtime error
     // each statement's rule lives in Environment::execute
     for item in &items {
-        env.execute(item, print_values)
+        let flow = env
+            .execute(item, print_values)
             .map_err(|err| CliError::Runtime(err.to_string()))?;
+        // render() asks the whole program to stop after it writes its file
+        if flow == Flow::Stop {
+            break;
+        }
     }
     Ok(())
 }

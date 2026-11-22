@@ -344,15 +344,16 @@ storage exists. These are separate from the time a name acquires a value or type
 | `let` executes successfully | A named storage slot is inserted into the current environment after evaluating the initializer. With an initializer, its value and runtime type are established now. |
 | `let name` executes | Storage exists, but no value or type is assigned yet. This differs from explicitly storing `null`. |
 | Assignment executes | The nearest existing slot gets the new value and its runtime type; storage is reused and the type may change. |
-| Element or control-flow body starts | A new environment links to the enclosing environment; declarations create slots as they execute. Each loop iteration has a fresh environment. |
+| Element or control-flow body starts | A new scope is pushed onto the environment stack; declarations create slots as they execute. Each loop iteration has a fresh scope. |
 | Body ends, normally or with an error | Its environment is removed from lookup and its local binding storage is released. Outer bindings survive. |
 | File/REPL ends | The global environment and its bindings are released. |
 
 Global bindings have run/session duration once declared. Body-local storage is
 stack-dynamic in the interpreted language: it lasts for that body activation.
-The Rust implementation uses heap-allocated `Rc<RefCell<Scope>>` maps, but this does
-not promise implicit heap-dynamic guest bindings. There are no guest allocation
-or deallocation operations, escaping closures, or retained local bindings yet.
+The Rust implementation keeps a stack of `Scope` maps, with the global scope at
+the bottom. This does not promise implicit heap-dynamic guest bindings. There are
+no guest allocation or deallocation operations, escaping closures, or retained
+local bindings yet.
 
 The scope tests provide concrete traces:
 

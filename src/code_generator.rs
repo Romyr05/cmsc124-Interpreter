@@ -1,6 +1,7 @@
 use crate::ast::Element;
+use crate::environment::Environment;
 use crate::errors::RuntimeError;
-use crate::evaluator::{Environment, stringify};
+use crate::evaluator::stringify;
 use crate::parser::TopLevel;
 use crate::token_types::TokenType;
 

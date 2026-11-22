@@ -1,5 +1,6 @@
 mod ast;
 mod code_generator;
+mod environment;
 mod errors;
 mod evaluator;
 pub mod keyword_list;
@@ -10,8 +11,8 @@ mod scanner;
 mod token_types;
 mod tree_printer;
 
+use crate::environment::Environment;
 use crate::errors::CliError;
-use crate::evaluator::Environment;
 use crate::parser::Parser;
 use crate::runner::run_source;
 use crate::scanner::Tokenizer;
@@ -77,8 +78,8 @@ fn tokenize_file(path: &str) -> Result<(), CliError> {
 // scan, parse, and run are shared with the REPL (runner.rs)
 fn eval_file(path: &str) -> Result<(), CliError> {
     let source = fs::read_to_string(path)?;
-    // one environment for the whole file
-    let mut env = Environment::default();
+    // one environment for the whole file; the path is kept for render() output
+    let mut env = Environment::for_source(path);
     //true print values since it prints the values
     run_source(&source, &mut env, 1, true)
 }
@@ -87,7 +88,7 @@ fn eval_file(path: &str) -> Result<(), CliError> {
 // bare expression values are discarded
 fn run_file(path: &str) -> Result<(), CliError> {
     let source = fs::read_to_string(path)?;
-    let mut env = Environment::default();
+    let mut env = Environment::for_source(path);
     // false print_values since running a file needs a print() statement
     run_source(&source, &mut env, 1, false)
 }
