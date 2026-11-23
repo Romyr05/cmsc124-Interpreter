@@ -1,0 +1,6 @@
+render(box() {
+  div() {
+    text() { "A & B" }
+    par() { "Done" }
+  }
+})                # expect nothing

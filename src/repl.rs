@@ -1,4 +1,4 @@
-use crate::evaluator::Environment;
+use crate::environment::Environment;
 use crate::runner::run_source;
 use std::io::{self, Write};
 

@@ -30,6 +30,9 @@ as printing, changing a binding, or generating an element.
 | `./run --eval <file>` | Runs a program like `./run <file>`, but also prints each bare expression's value. |
 | `./run` | Starts the REPL; bare expression values are printed. |
 
+`render(element)` writes a sibling `.html` file named after the source file and
+stops interpretation after a successful write. See [render](#render) below.
+
 File execution and `--eval` check the whole source for scan/parse errors before
 running anything. `--parse` also requires valid syntax; `--tokenize` prints tokens
 and reports scanner errors without executing the program. The REPL validates each
@@ -180,6 +183,7 @@ statement   -> element
              | whileStmt
              | letDecl
              | printStmt
+             | renderStmt
              | assignment
              | exprStmt
 
@@ -191,6 +195,7 @@ blockStmt   -> ifStmt | whileStmt | letDecl | printStmt | assignment | exprStmt
 
 letDecl     -> "let" IDENTIFIER ( "=" expression )?
 printStmt   -> "print" "(" expression ")"
+renderStmt  -> "render" "(" element ")"
 assignment  -> IDENTIFIER "=" expression
 exprStmt    -> expression
 
@@ -286,6 +291,20 @@ Operands are evaluated left to right, except when `and` or `or` short-circuits.
   prints `7`, then the `<div>` HTML.
 - `--parse` shows it as `(print <expr>)`.
 
+### render
+
+- Syntax: `render(element)` on its own line, for example `render(box() { text() { "Hello" } })`.
+- The argument must be an element literal. `render()` and `render(expression)` are parse errors.
+- `render` is allowed only at top level. It is a parse error inside an element or control-flow body.
+- A source file may contain at most one render; a second one is a parse error (exit 65).
+- The element is generated with the current environment and the normal default document wrapper.
+- Output path: the source file with its extension replaced by `.html`. `examples/demo.fmyr` writes `examples/demo.html`; an existing file is overwritten.
+- After a successful write, interpretation stops. Statements after render do not run.
+- Top-level elements before render still print their own documents to stdout.
+- `render` prints `Rendered <path>` to stderr on success. It produces no stdout output.
+- In the REPL there is no source file, so render reports `render() requires running a .fmyr file.` and the session continues.
+- `--parse` shows it as `(render <element>)`; `--tokenize` and `--parse` never write files.
+
 ### Truthiness
 
 Only `false` and `null` are falsey. Numbers (including `0`) and strings
@@ -344,15 +363,16 @@ storage exists. These are separate from the time a name acquires a value or type
 | `let` executes successfully | A named storage slot is inserted into the current environment after evaluating the initializer. With an initializer, its value and runtime type are established now. |
 | `let name` executes | Storage exists, but no value or type is assigned yet. This differs from explicitly storing `null`. |
 | Assignment executes | The nearest existing slot gets the new value and its runtime type; storage is reused and the type may change. |
-| Element or control-flow body starts | A new environment links to the enclosing environment; declarations create slots as they execute. Each loop iteration has a fresh environment. |
+| Element or control-flow body starts | A new scope is pushed onto the environment stack; declarations create slots as they execute. Each loop iteration has a fresh scope. |
 | Body ends, normally or with an error | Its environment is removed from lookup and its local binding storage is released. Outer bindings survive. |
 | File/REPL ends | The global environment and its bindings are released. |
 
 Global bindings have run/session duration once declared. Body-local storage is
 stack-dynamic in the interpreted language: it lasts for that body activation.
-The Rust implementation uses heap-allocated `Rc<RefCell<Scope>>` maps, but this does
-not promise implicit heap-dynamic guest bindings. There are no guest allocation
-or deallocation operations, escaping closures, or retained local bindings yet.
+The Rust implementation keeps a stack of `Scope` maps, with the global scope at
+the bottom. This does not promise implicit heap-dynamic guest bindings. There are
+no guest allocation or deallocation operations, escaping closures, or retained
+local bindings yet.
 
 The scope tests provide concrete traces:
 
@@ -508,6 +528,8 @@ the REPL; the entry point only selects whether bare values are displayed.
 - Only `color` affects element styling; the other parsed attributes are ignored.
 - `box` and `image` currently emit only their contents. Additional components,
   functions, closures, and events remain planned features.
+- `render` is top-level only, limited to one call per file, and unavailable in
+  the REPL. It overwrites an existing sibling `.html` file.
 - Extremely deep expressions can overflow the host stack (#53).
 
 ## Changelog
@@ -519,3 +541,4 @@ the REPL; the entry point only selects whether bare values are displayed.
 | 1PR1 | defined valid tokens and operators (ie. Grammars) |
 | 1PR2 | expanded on keywords and allowed tokenizer to detect them |
 | Lab 4 | Mutable bindings, lexical body scopes, explicit printing, file execution, and scoped button colors. |
+| Lab 5 | `render(element)` writes a sibling `.html` document and ends interpretation. |

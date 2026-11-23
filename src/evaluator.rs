@@ -1,191 +1,13 @@
 // Tree-walking evaluator: walks an Expr and produces a runtime Value.
 // Post-order traversal: each node evaluates its children before itself.
 use crate::ast::{Expr, Value};
-use crate::code_generator::generate;
+use crate::environment::Environment;
 use crate::errors::RuntimeError;
-use crate::parser::TopLevel;
 use crate::token_types::{Token, TokenType};
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::rc::Rc;
 
-// one scope: its own bindings (name -> value) plus a link to the scope around it.
-// None = declared with `let x` but not given a value yet.
-// parent is None for the global scope.
-// Rc<RefCell<..>> = shared ownership + mutation checked at runtime
-// For reference and chainging the ownership and can mutate at runtime
-#[derive(Default)]
-struct Scope {
-    values: HashMap<String, Option<Value>>,
-    parent: Option<Rc<RefCell<Scope>>>,
-}
-
-// the interpreter's state: the scope code is currently running in.
-// created once per file run / REPL session, so global bindings survive between lines
-// used for the reference cell scope to see where it is currently ( inner and whatnot)
-#[derive(Default)]
-pub struct Environment {
-    current: Rc<RefCell<Scope>>,
-}
-
+// Expression evaluation is an extension of the environment: it reads bindings
+// through Environment::lookup but does not own scope or statement execution.
 impl Environment {
-    // run `work` in a new scope whose parent is the current one, then put the outer
-    // scope back. The restore always runs, even when work fails (no ? in between),
-    // so after an error the REPL is back at the scope it started in.
-    pub fn in_new_scope(
-        &mut self,
-        work: impl FnOnce(&mut Environment) -> Result<(), RuntimeError>,
-        // called only once to get what is the thing inside the inner
-    ) -> Result<(), RuntimeError> {
-        let outer = Rc::clone(&self.current);
-        self.current = Rc::new(RefCell::new(Scope {
-            values: HashMap::new(),
-            parent: Some(Rc::clone(&outer)),
-        }));
-        let result = work(self); //basically mean execute_body for this we execute it 
-        self.current = outer;
-        result
-    }
-
-    // search from the current scope outward; the innermost scope that has the name wins
-    // outer None = no scope has it; inner None = declared but no value yet
-
-    //CHceks current scope values and then if not found it checks the parent
-    fn lookup(&self, name: &str) -> Option<Option<Value>> {
-        let mut scope = Rc::clone(&self.current);
-        loop {
-            let parent = {
-                let s = scope.borrow();
-                if let Some(value) = s.values.get(name) {
-                    return Some(value.clone());
-                }
-                s.parent.clone()
-            };
-            // no parent left = searched every scope without finding it
-            scope = parent?;
-        }
-    }
-
-    // run one statement. Shared by the runner (top level), element bodies, and
-    // control-flow bodies, so each statement's rule is written once.
-    // print_values: print a bare expression's value (--eval, REPL) or discard it (plain ./run)
-    pub fn execute(&mut self, stmt: &TopLevel, print_values: bool) -> Result<(), RuntimeError> {
-        match stmt {
-            // always evaluated (so errors still surface); the value is printed only if asked
-            TopLevel::Expr(expr) => {
-                let value = self.evaluate(expr)?;
-
-                // If false needs to have a print otherwise no need na
-                if print_values {
-                    println!("{}", stringify(&value));
-                }
-            }
-            // a top-level element: its HTML is printed once the whole element is built
-            TopLevel::Element(element) => println!("{}", generate(element, self)?),
-            // print writes the value to the terminal
-            // If it catches this it just prints tha value to the terminal and no replacing it as html
-            // Makes it the appropriate value to be shown
-            TopLevel::Print(expr) => println!("{}", stringify(&self.evaluate(expr)?)),
-            // a declaration prints nothing; on error the table is left as it was
-            TopLevel::Let {
-                name,
-                initializer,
-                line,
-            } => self.declare(name, initializer.as_ref(), *line)?,
-            // an assignment prints nothing, like a declaration
-            TopLevel::Assign { name, value, line } => self.assign(name, value, *line)?,
-            // only the chosen branch runs; with no else, a falsey condition does nothing
-            TopLevel::If {
-                condition,
-                then_branch,
-                else_branch,
-            } => {
-                if is_truthy(&self.evaluate(condition)?) {
-                    self.execute_block(then_branch, print_values)?;
-                } else if let Some(branch) = else_branch {
-                    self.execute_block(branch, print_values)?;
-                }
-            }
-            // check, run the body, check again; a falsey first check runs it zero times.
-            // execute_block makes a fresh scope on every iteration
-            TopLevel::While { condition, body } => {
-                while is_truthy(&self.evaluate(condition)?) {
-                    self.execute_block(body, print_values)?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    // run a control-flow body in its own scope (restored even if a statement fails)
-    // executes each statemetns and using in_newscope so we go back to the outer scope and restoring it (current scope)
-    fn execute_block(
-        &mut self,
-        stmts: &[TopLevel],
-        print_values: bool,
-    ) -> Result<(), RuntimeError> {
-        self.in_new_scope(|env| {
-            for stmt in stmts {
-                env.execute(stmt, print_values)?;
-            }
-            Ok(())
-        })
-    }
-
-    // checks whether the name already exists in the current scope only. It doesn’t check the outer scopes
-    // Evaluates first and then if fails return early
-    pub fn declare(
-        &mut self,
-        name: &str,
-        initializer: Option<&Expr>,
-        line: usize,
-    ) -> Result<(), RuntimeError> {
-        let value = match initializer {
-            Some(expr) => Some(self.evaluate(expr)?),
-            None => None,
-        };
-        // only the current scope counts: an inner `let x` may shadow an outer x
-        let mut scope = self.current.borrow_mut();
-        if scope.values.contains_key(name) {
-            return Err(RuntimeError {
-                line,
-                message: format!("Variable '{}' already declared.", name),
-            });
-        }
-        scope.values.insert(name.to_string(), value);
-        Ok(())
-    }
-
-    // computes the new value, then searches for an existing binding to update.
-    // starts in the current scope and moves outward if necessary
-    // name = value: evaluate first (an error leaves every scope untouched), then
-    // update the nearest scope, innermost outward, that already has the name.
-    // Never creates a binding; the new value may be a different type.
-    pub fn assign(&mut self, name: &str, value: &Expr, line: usize) -> Result<(), RuntimeError> {
-        let value = self.evaluate(value)?; // Evaluates right hand side first 
-        let mut scope = Rc::clone(&self.current);
-        loop {
-            let parent = {
-                let mut s = scope.borrow_mut();
-                if let Some(slot) = s.values.get_mut(name) {
-                    *slot = Some(value);
-                    return Ok(());
-                }
-                s.parent.clone() // follow parent (outer scope) if not found
-            };
-            match parent {
-                Some(p) => scope = p,
-                // searched every scope: assignment must not create the name
-                None => {
-                    return Err(RuntimeError {
-                        line,
-                        message: format!("Undefined variable '{}'.", name),
-                    });
-                }
-            }
-        }
-    }
-
     // the one entry point: ask what node this is and do the matching thing
     pub fn evaluate(&self, expr: &Expr) -> Result<Value, RuntimeError> {
         match expr {
@@ -201,16 +23,16 @@ impl Environment {
             } => self.eval_binary(operator, left, right),
             // look the name up, innermost scope first; missing everywhere -> undefined
             Expr::Variable { name, line } => match self.lookup(name) {
-                Some(Some(value)) => Ok(value),
+                Some(Some(value)) => Ok(value.clone()),
                 // declared with `let x` but never given a value
-                Some(None) => Err(RuntimeError {
-                    line: *line,
-                    message: format!("Variable '{}' used before assignment.", name),
-                }),
-                None => Err(RuntimeError {
-                    line: *line,
-                    message: format!("Undefined variable '{}'.", name),
-                }),
+                Some(None) => Err(RuntimeError::new(
+                    *line,
+                    format!("Variable '{}' used before assignment.", name),
+                )),
+                None => Err(RuntimeError::new(
+                    *line,
+                    format!("Undefined variable '{}'.", name),
+                )),
             },
         }
     }
@@ -221,17 +43,14 @@ impl Environment {
             // arithmetic negation: operand must be a number
             TokenType::Minus => match right {
                 Value::Number(n) => Ok(Value::Number(-n)),
-                _ => Err(RuntimeError {
-                    line: operator.line,
-                    message: "Operand must be a number.".to_string(),
-                }),
+                _ => Err(RuntimeError::new(
+                    operator.line,
+                    "Operand must be a number.",
+                )),
             },
             // logical not -> any value has a truthiness, so this never errors
             TokenType::Not => Ok(Value::Bool(!is_truthy(&right))),
-            _ => Err(RuntimeError {
-                line: operator.line,
-                message: "Unknown unary operator.".to_string(),
-            }),
+            _ => Err(RuntimeError::new(operator.line, "Unknown unary operator.")),
         }
     }
 
@@ -278,10 +97,10 @@ impl Environment {
 
                 // Foir the concatenation of both string
                 (Value::Str(a), Value::Str(b)) => Ok(Value::Str(format!("{}{}", a, b))),
-                _ => Err(RuntimeError {
-                    line: operator.line,
-                    message: "Operands must be two numbers or two strings.".to_string(),
-                }),
+                _ => Err(RuntimeError::new(
+                    operator.line,
+                    "Operands must be two numbers or two strings.",
+                )),
             },
 
             TokenType::Minus => {
@@ -325,17 +144,17 @@ impl Environment {
             TokenType::Equality => Ok(Value::Bool(left == right)),
             TokenType::NotEqual => Ok(Value::Bool(left != right)),
 
-            _ => Err(RuntimeError {
-                line: operator.line,
-                message: "Operator not supported yet.".to_string(),
-            }),
+            _ => Err(RuntimeError::new(
+                operator.line,
+                "Operator not supported yet.",
+            )),
         }
     }
 }
 
 // For bool values
 // only false and null are falsey, everything else (0, "") is truthy
-fn is_truthy(value: &Value) -> bool {
+pub(crate) fn is_truthy(value: &Value) -> bool {
     match value {
         Value::Bool(b) => *b,
         Value::Nil => false,
@@ -351,10 +170,10 @@ fn number_operands(
 ) -> Result<(f64, f64), RuntimeError> {
     match (left, right) {
         (Value::Number(a), Value::Number(b)) => Ok((*a, *b)),
-        _ => Err(RuntimeError {
-            line: operator.line,
-            message: "Operands must be numbers.".to_string(),
-        }),
+        _ => Err(RuntimeError::new(
+            operator.line,
+            "Operands must be numbers.",
+        )),
     }
 }
 

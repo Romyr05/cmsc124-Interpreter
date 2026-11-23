@@ -1,3 +1,5 @@
 /target
 run_tests.py
 /modules
+tests/lab5/render/*.html
+!tests/lab5/render/*.expected.html

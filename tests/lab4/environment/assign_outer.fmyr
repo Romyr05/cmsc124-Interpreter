@@ -1,0 +1,5 @@
+let x = 1
+if (true) {
+  x = 7
+}
+print(x)          # expect: 7

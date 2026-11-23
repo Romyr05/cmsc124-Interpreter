@@ -1,6 +1,7 @@
 use crate::ast::Element;
+use crate::environment::Environment;
 use crate::errors::RuntimeError;
-use crate::evaluator::{Environment, stringify};
+use crate::evaluator::stringify;
 use crate::parser::TopLevel;
 use crate::token_types::TokenType;
 
@@ -30,7 +31,10 @@ fn append_children(
                 // terminal, never into body (the HTML), so its line appears before the
                 // element's HTML is printed
                 // For the terminal side; makes it a
-                statement => env.execute(statement, false)?,
+                // render() is top-level only, so a body statement never stops execution
+                statement => {
+                    env.execute(statement, false)?;
+                }
             }
         }
         Ok(())

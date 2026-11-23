@@ -32,6 +32,7 @@ pub enum TokenType {
     Identifier,
     Initialize,
     Print,
+    Render,
     If,
     Else,
     While,

@@ -45,9 +45,21 @@ impl fmt::Display for ParseError<'_> {
 impl std::error::Error for ParseError<'_> {}
 
 // Runtime errors carry the source line and a diagnostic message.
+#[derive(Debug)]
 pub struct RuntimeError {
     pub line: usize,
     pub message: String,
+}
+
+impl RuntimeError {
+    // Every runtime failure has the same shape, so construction lives in one
+    // place instead of spelling out the struct at every error site.
+    pub fn new(line: usize, message: impl Into<String>) -> Self {
+        RuntimeError {
+            line,
+            message: message.into(),
+        }
+    }
 }
 
 impl fmt::Display for RuntimeError {

@@ -18,6 +18,8 @@ pub struct Parser<'a> {
     current: usize,
     // every syntax error found so far, in source order (top level and element bodies)
     errors: Vec<ParseError<'a>>,
+    // render() is a one-shot entry point; a second one is a syntax error
+    seen_render: bool,
 }
 
 #[derive(Debug)]
@@ -34,6 +36,12 @@ pub enum TopLevel<'a> {
     },
     // print(expression): writes the value to the terminal, never into HTML
     Print(Expr<'a>),
+    // render(element): writes one complete HTML document to a sibling .html file
+    // and ends interpretation. Only valid at top level.
+    Render {
+        element: Box<Element<'a>>,
+        line: usize,
+    },
     // name = value: updates the nearest existing binding; line points at the name
     Assign {
         name: String,
@@ -60,6 +68,7 @@ impl<'a> Parser<'a> {
             tokens,
             current: 0,
             errors: Vec::new(),
+            seen_render: false,
         }
     }
 
@@ -436,6 +445,12 @@ impl<'a> Parser<'a> {
     // one child of an element body: a nested element, a let, a print, or an expression
     // (also if/else bodies, which pass allow_elements = false: statements only)
     fn body_child(&mut self, allow_elements: bool) -> Result<TopLevel<'a>, ParseError<'a>> {
+        if self.is_type(TokenType::Render) {
+            return Err(ParseError {
+                token: *self.peek(),
+                message: "render() is only allowed at top level.".to_string(),
+            });
+        }
         if is_element_keyword(self.peek().token_type) {
             if !allow_elements {
                 return Err(ParseError {
@@ -530,6 +545,8 @@ impl<'a> Parser<'a> {
             // When printing is found
         } else if self.consume_on_type(&[TokenType::Print]) {
             self.print_statement()?
+        } else if self.consume_on_type(&[TokenType::Render]) {
+            self.render_statement()?
         } else if self.consume_on_type(&[TokenType::If]) {
             self.if_statement()?
         } else if self.consume_on_type(&[TokenType::While]) {
@@ -611,6 +628,33 @@ impl<'a> Parser<'a> {
         let expr = self.expression()?;
         self.expect(TokenType::RightParen, "Expected ')' after print value")?;
         Ok(TopLevel::Print(expr))
+    }
+
+    // render ( element )   (the `render` was already consumed)
+    // The element is required: render() and render(expression) are errors.
+    fn render_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
+        let keyword = *self.previous();
+        if self.seen_render {
+            return Err(ParseError {
+                token: keyword,
+                message: "Only one render() is allowed per file.".to_string(),
+            });
+        }
+        self.seen_render = true;
+
+        self.expect(TokenType::LeftParen, "Expected '(' after 'render'")?;
+        if !is_element_keyword(self.peek().token_type) {
+            return Err(ParseError {
+                token: *self.peek(),
+                message: "render() expects an element argument".to_string(),
+            });
+        }
+        let element = self.element()?;
+        self.expect(TokenType::RightParen, "Expected ')' after render element")?;
+        Ok(TopLevel::Render {
+            element: Box::new(element),
+            line: keyword.line,
+        })
     }
 
     // error recovery: discard tokens up to and including the next newline,

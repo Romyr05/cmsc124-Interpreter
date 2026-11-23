@@ -1,0 +1,4 @@
+text() { "before" }  # expect: <!DOCTYPE html><html lang="html"><head></head><body><h1>before</h1></body></html>
+render(box() {
+  par() { "page" }
+})
