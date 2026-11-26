@@ -1,0 +1,1 @@
+render(box() {}, lang = "en<US>")   # expect nothing

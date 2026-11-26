@@ -1,0 +1,3 @@
+render(box() {
+  text() { "Hello" }
+}, title = "My Page")   # expect nothing

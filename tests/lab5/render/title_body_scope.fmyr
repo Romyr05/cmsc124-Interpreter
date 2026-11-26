@@ -1,0 +1,3 @@
+render(box() {
+  let local = "inside"
+}, title = local)   # expect runtime error: Undefined variable 'local'.
