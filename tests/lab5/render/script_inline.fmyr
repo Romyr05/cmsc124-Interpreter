@@ -1,0 +1,6 @@
+render(div() {
+  text() { "Click" }
+  script() {
+    "console.log('hello')"
+  }
+}, title = "Interactive", lang = "en")   # expect nothing

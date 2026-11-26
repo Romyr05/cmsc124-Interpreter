@@ -1,0 +1,6 @@
+let name = "World"
+render(box() {
+  script() {
+    "console.log('Hello, " + name + "')"
+  }
+})   # expect nothing

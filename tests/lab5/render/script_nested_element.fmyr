@@ -1,0 +1,5 @@
+render(box() {
+  script() {
+    text() { "oops" }
+  }
+})   # expect error: Elements are not allowed inside a script body
