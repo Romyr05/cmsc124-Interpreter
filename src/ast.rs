@@ -23,6 +23,28 @@ pub struct Attribute<'a> {
     pub value: Expr<'a>,
 }
 
+// Named document options on render(...): title = "..." and lang = "...".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RenderOptionKind {
+    Title,
+    Lang,
+}
+
+impl RenderOptionKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            RenderOptionKind::Title => "title",
+            RenderOptionKind::Lang => "lang",
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct RenderOption<'a> {
+    pub kind: RenderOptionKind,
+    pub value: Expr<'a>,
+}
+
 #[derive(Debug, Clone)]
 pub enum Expr<'a> {
     Literal {

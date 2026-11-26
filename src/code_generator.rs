@@ -5,6 +5,23 @@ use crate::evaluator::stringify;
 use crate::parser::TopLevel;
 use crate::token_types::TokenType;
 
+// Values for the document wrapper around a rendered element. `Default` keeps
+// the original boilerplate, so top-level elements and old tests are unchanged.
+#[derive(Debug, Clone)]
+pub struct DocumentOptions {
+    pub lang: String,
+    pub title: Option<String>,
+}
+
+impl Default for DocumentOptions {
+    fn default() -> Self {
+        DocumentOptions {
+            lang: "html".to_string(),
+            title: None,
+        }
+    }
+}
+
 fn append_children(
     element: &Element<'_>,
     body: &mut String,
@@ -88,21 +105,32 @@ fn escape_html(text: &str) -> String {
         .replace('\'', "&#39;")
 }
 
-// Generate the HTML document for an element AST.
-// env is mutable: element bodies are scopes and may declare their own bindings
+// Generate the HTML document for an element AST with the default boilerplate.
+// Top-level elements use this path; render() uses generate_document instead.
 pub fn generate(element: &Element<'_>, env: &mut Environment) -> Result<String, RuntimeError> {
-    let html_start = "<!DOCTYPE html><html lang=\"html\">";
-    let html_end = "</html>";
-    let head_start = "<head>";
-    let head_end = "</head>";
-    let body_start = "<body>";
-    let body_end = "</body>";
-    let mut body = String::new();
+    generate_document(element, env, &DocumentOptions::default())
+}
 
+// Generate a full document with caller-selected lang/title values.
+// env is mutable: element bodies are scopes and may declare their own bindings.
+pub fn generate_document(
+    element: &Element<'_>,
+    env: &mut Environment,
+    options: &DocumentOptions,
+) -> Result<String, RuntimeError> {
+    let mut body = String::new();
     append_element(element, &mut body, env)?;
 
+    // Defaults produce exactly <head></head>; only an explicit title adds a tag.
+    let head = match &options.title {
+        Some(title) => format!("<title>{}</title>", escape_html(title)),
+        None => String::new(),
+    };
+
     Ok(format!(
-        "{}{}{}{}{}{}{}",
-        html_start, head_start, head_end, body_start, body, body_end, html_end
+        "<!DOCTYPE html><html lang=\"{}\"><head>{}</head><body>{}</body></html>",
+        escape_html(&options.lang),
+        head,
+        body
     ))
 }

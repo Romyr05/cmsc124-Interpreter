@@ -1,4 +1,4 @@
-use crate::ast::{Attribute, Element, Expr, Value};
+use crate::ast::{Attribute, Element, Expr, RenderOption, RenderOptionKind, Value};
 use crate::errors::ParseError;
 use crate::keyword_list::{is_attribute_keyword, is_element_keyword};
 use crate::token_types::{Token, TokenType};
@@ -36,10 +36,11 @@ pub enum TopLevel<'a> {
     },
     // print(expression): writes the value to the terminal, never into HTML
     Print(Expr<'a>),
-    // render(element): writes one complete HTML document to a sibling .html file
-    // and ends interpretation. Only valid at top level.
+    // render(element, options...): writes one complete HTML document to a
+    // sibling .html file and ends interpretation. Only valid at top level.
     Render {
         element: Box<Element<'a>>,
+        options: Vec<RenderOption<'a>>,
         line: usize,
     },
     // name = value: updates the nearest existing binding; line points at the name
@@ -630,7 +631,7 @@ impl<'a> Parser<'a> {
         Ok(TopLevel::Print(expr))
     }
 
-    // render ( element )   (the `render` was already consumed)
+    // render ( element ( "," renderOption )* )   (the `render` was already consumed)
     // The element is required: render() and render(expression) are errors.
     fn render_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
         let keyword = *self.previous();
@@ -650,11 +651,48 @@ impl<'a> Parser<'a> {
             });
         }
         let element = self.element()?;
+        let options = self.render_options()?;
         self.expect(TokenType::RightParen, "Expected ')' after render element")?;
         Ok(TopLevel::Render {
             element: Box::new(element),
+            options,
             line: keyword.line,
         })
+    }
+
+    // ( "," IDENTIFIER "=" expression )* after the render element.
+    // title and lang stay ordinary identifiers everywhere outside this list.
+    fn render_options(&mut self) -> Result<Vec<RenderOption<'a>>, ParseError<'a>> {
+        let mut options: Vec<RenderOption<'a>> = Vec::new();
+        while self.consume_on_type(&[TokenType::Comma]) {
+            let name = *self.expect(
+                TokenType::Identifier,
+                "Expected render option name after ','",
+            )?;
+            let kind = match name.lexeme {
+                "title" => RenderOptionKind::Title,
+                "lang" => RenderOptionKind::Lang,
+                _ => {
+                    return Err(ParseError {
+                        token: name,
+                        message: format!(
+                            "Unknown render option '{}'. Expected title or lang.",
+                            name.lexeme
+                        ),
+                    });
+                }
+            };
+            if options.iter().any(|option| option.kind == kind) {
+                return Err(ParseError {
+                    token: name,
+                    message: format!("Duplicate render option '{}'.", name.lexeme),
+                });
+            }
+            self.expect(TokenType::Equal, "Expected '=' after render option name")?;
+            let value = self.expression()?;
+            options.push(RenderOption { kind, value });
+        }
+        Ok(options)
     }
 
     // error recovery: discard tokens up to and including the next newline,
