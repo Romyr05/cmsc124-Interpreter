@@ -30,8 +30,9 @@ as printing, changing a binding, or generating an element.
 | `./run --eval <file>` | Runs a program like `./run <file>`, but also prints each bare expression's value. |
 | `./run` | Starts the REPL; bare expression values are printed. |
 
-`render(element)` writes a sibling `.html` file named after the source file and
-stops interpretation after a successful write. See [render](#render) below.
+`render(element, title = ..., lang = ...)` writes a sibling `.html` file named
+after the source file and stops interpretation after a successful write. See
+[render](#render) below.
 
 File execution and `--eval` check the whole source for scan/parse errors before
 running anything. `--parse` also requires valid syntax; `--tokenize` prints tokens
@@ -56,10 +57,11 @@ Program output goes to stdout; diagnostics go to stderr.
 
 #### Components
 
-The parser recognizes `div`, `text`, `par`, `button`, `box`, and `image`.
-`div`, `text`, `par`, and `button` render tags; `box` and `image` currently emit
-only their contents. The broader component catalog below includes planned features;
-entries beyond those six are not recognized as element keywords yet.
+The parser recognizes `div`, `text`, `par`, `button`, `box`, `image`, and
+`script`. `div`, `text`, `par`, `button`, and `script` render tags; `box` and
+`image` currently emit only their contents. The broader component catalog below
+includes planned features; entries beyond those seven are not recognized as
+element keywords yet.
 
 | Keyword | function |
 |---|---|
@@ -69,6 +71,7 @@ entries beyond those six are not recognized as element keywords yet.
 | `box` | similar to div but predetermined height and width |
 | `image` | parsed element; image rendering is planned |
 | `par` | paragraph rendered as `<p>` |
+| `script` | inline JavaScript rendered raw inside `<script>` |
 | `input` | text entry field |
 | `checkbox` | boolean toggle component |
 | `radio` | single-select option among a group |
@@ -195,12 +198,13 @@ blockStmt   -> ifStmt | whileStmt | letDecl | printStmt | assignment | exprStmt
 
 letDecl     -> "let" IDENTIFIER ( "=" expression )?
 printStmt   -> "print" "(" expression ")"
-renderStmt  -> "render" "(" element ")"
+renderStmt  -> "render" "(" element ( "," renderOption )* ")"
+renderOption -> ("title" | "lang") "=" expression
 assignment  -> IDENTIFIER "=" expression
 exprStmt    -> expression
 
 element     -> ELEMENT "(" attributes? ")" "{" body "}"
-ELEMENT     -> "button" | "box" | "text" | "image" | "div" | "par"
+ELEMENT     -> "button" | "box" | "text" | "image" | "div" | "par" | "script"
 attributes  -> attribute ( "," attribute )*
 attribute   -> ATTRIBUTE "=" expression
 ATTRIBUTE   -> "id" | "class" | "align" | "padding" | "margin"
@@ -246,6 +250,8 @@ For `(2 + 3)`, `--parse` prints:
 Operators use prefix notation, parentheses become `(group <expr>)`, and numbers
 include a fractional part (`2.0`). Statements include `(let name <expr>)`,
 `(= name <expr>)`, and `(print <expr>)`; uninitialized declarations print `(let name)`.
+`render` prints `(render <element> (title <expr>) (lang <expr>))`, including only
+the options present in the source.
 
 ## Semantics
 
@@ -293,17 +299,51 @@ Operands are evaluated left to right, except when `and` or `or` short-circuits.
 
 ### render
 
-- Syntax: `render(element)` on its own line, for example `render(box() { text() { "Hello" } })`.
-- The argument must be an element literal. `render()` and `render(expression)` are parse errors.
+- Syntax: `render(element, option = expression, ...)` on its own line, for example
+  `render(box() { text() { "Hello" } }, title = "Greeting", lang = "en")`.
+- The first argument must be an element literal. `render()` and `render(expression)` are parse errors.
+- Optional named parameters customize the document boilerplate:
+  - `title`: evaluated in the enclosing scope, converted with the normal value-printing
+    rules, HTML-escaped, and written as `<title>...</title>` inside `<head>`.
+  - `lang`: evaluated in the enclosing scope, converted with the normal value-printing
+    rules, HTML-escaped, and used for `<html lang="...">`. The default remains `"html"`.
+  - Parameters may appear in any order after the element. Unknown, duplicate, or
+    malformed parameters are parse errors (exit 65). With no parameters, the document
+    wrapper is unchanged: `<head></head>` and `<html lang="html">`.
+  - Parameter expressions run before the element body, so they cannot read bindings
+    declared inside that body.
 - `render` is allowed only at top level. It is a parse error inside an element or control-flow body.
 - A source file may contain at most one render; a second one is a parse error (exit 65).
-- The element is generated with the current environment and the normal default document wrapper.
 - Output path: the source file with its extension replaced by `.html`. `examples/demo.fmyr` writes `examples/demo.html`; an existing file is overwritten.
 - After a successful write, interpretation stops. Statements after render do not run.
 - Top-level elements before render still print their own documents to stdout.
 - `render` prints `Rendered <path>` to stderr on success. It produces no stdout output.
 - In the REPL there is no source file, so render reports `render() requires running a .fmyr file.` and the session continues.
-- `--parse` shows it as `(render <element>)`; `--tokenize` and `--parse` never write files.
+- `--parse` shows it as `(render <element> (title <expr>) (lang <expr>))`, including
+  only the options present in the source; `--tokenize` and `--parse` never write files.
+
+### script
+
+- Syntax: `script() { ... }`, usable anywhere an element is allowed: at top level,
+  nested inside another element, or as the render root.
+- The element emits `<script>` followed by its body's expression values and then
+  `</script>`. Expression values use the normal value-printing rules and are inserted
+  **raw**, without HTML escaping. Consecutive expression values are separated by a
+  newline so separate DSL strings do not merge into one JavaScript statement.
+- A top-level script prints a complete default document to stdout, like any other
+  element. To attach JavaScript to a rendered page, nest the script inside the
+  element passed to `render`.
+- Script bodies may contain `let`, assignment, `print`, `if`, and `while`, but
+  nested elements are a parse error (exit 65). `print()` still writes to the terminal,
+  never into the generated JavaScript.
+- As in other element bodies, only direct expression children contribute output;
+  bare expressions inside `if`/`while` bodies are evaluated and discarded. To build
+  conditional or repeated JavaScript, accumulate it in a string variable and expose
+  that variable as the final expression.
+- Attributes are parsed but ignored, and no external `src` support exists yet.
+- Strings keep the normal literal rules: no escape decoding, and literal newlines
+  are allowed. Use single quotes for JavaScript string literals. A literal
+  `</script>` in the JavaScript closes the HTML tag early; it is not escaped.
 
 ### Truthiness
 
@@ -444,7 +484,7 @@ tracked in issue #74.
 | tests/lab2 | Parser | sidecar | `--parse` |
 | tests/lab3 | Evaluator | inline | `--eval` |
 | tests/lab4 | Context | inline | none |
-| tests/lab5 | Control flow (implemented subset) | inline | none |
+| tests/lab5 | Control flow, render options, and script elements | inline | none |
 
 
 Parser recovery cases run through the same annotated file harness in
@@ -502,7 +542,7 @@ The div's text is blue and the button's label is red. `color` sets the CSS text
 color, rather than the background. The div header reads the global `shade` before
 entering its body. The inner declaration supplies red to the button header; after
 the body ends, `print(shade)` still reads blue. The button is a static HTML control;
-click handlers are not implemented.
+JavaScript behavior can be added with a nested `script` element.
 
 `div`, `text`, `par`, and `button` generate HTML tags (`div`, `h1`, `p`, and
 `button`). Their `color` expressions are evaluated in the enclosing scope before
@@ -510,6 +550,24 @@ the body runs, converted using the normal value-printing rules, and escaped for 
 HTML style attribute. Text content is also escaped. CSS interprets the resulting
 color value. Other attributes currently parse but do not affect generated HTML;
 `box` and `image` currently emit only their contents.
+
+Run [examples/interactive.fmyr](examples/interactive.fmyr) to see document options
+and JavaScript together:
+
+```text
+let heading = "Interactive Demo"
+
+render(div() {
+  text() { heading }
+  button() { "Say hello" }
+  script() {
+    "document.querySelector('button').addEventListener('click', () => alert('Hello!'))"
+  }
+}, title = heading, lang = "en")
+```
+
+This writes `examples/interactive.html` with `<html lang="en">`, a `<title>`,
+and an inline click handler for the button.
 
 ## Design rationale
 
@@ -529,7 +587,10 @@ the REPL; the entry point only selects whether bare values are displayed.
 - `box` and `image` currently emit only their contents. Additional components,
   functions, closures, and events remain planned features.
 - `render` is top-level only, limited to one call per file, and unavailable in
-  the REPL. It overwrites an existing sibling `.html` file.
+  the REPL. It overwrites an existing sibling `.html` file. Its document options
+  are limited to `title` and `lang`.
+- `script` content is emitted raw; external scripts (`src`) and `</script>`
+  escaping are not implemented. Its attributes are parsed but ignored.
 - Extremely deep expressions can overflow the host stack (#53).
 
 ## Changelog
@@ -541,4 +602,4 @@ the REPL; the entry point only selects whether bare values are displayed.
 | 1PR1 | defined valid tokens and operators (ie. Grammars) |
 | 1PR2 | expanded on keywords and allowed tokenizer to detect them |
 | Lab 4 | Mutable bindings, lexical body scopes, explicit printing, file execution, and scoped button colors. |
-| Lab 5 | `render(element)` writes a sibling `.html` document and ends interpretation. |
+| Lab 5 | `render(element, title = ..., lang = ...)` customizes the document wrapper and ends interpretation; `script() {}` embeds raw JavaScript. |

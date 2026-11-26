@@ -1,5 +1,5 @@
 ### Components
-box, button, text, image
+box, button, text, image, script
 
 ### Styling
 align, padding, margin, width, height, color, background, border, font
