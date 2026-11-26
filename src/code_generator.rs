@@ -58,11 +58,56 @@ fn append_children(
     })
 }
 
+// Script bodies are raw text: expression values go straight into <script>,
+// with a newline between consecutive chunks so separate DSL strings do not
+// silently merge into one JavaScript line.
+fn append_script_children(
+    element: &Element<'_>,
+    body: &mut String,
+    env: &mut Environment,
+) -> Result<(), RuntimeError> {
+    env.in_new_scope(|env| {
+        let mut wrote_expression = false;
+        for child in &element.children {
+            match child {
+                TopLevel::Expr(expr) => {
+                    let value = stringify(&env.evaluate(expr)?);
+                    if wrote_expression {
+                        body.push('\n');
+                    }
+                    body.push_str(&value);
+                    wrote_expression = true;
+                }
+                // The parser rejects nested elements inside script bodies.
+                // This arm only protects the generator if that invariant breaks.
+                TopLevel::Element(_) => {
+                    return Err(RuntimeError::new(
+                        0,
+                        "Elements are not allowed inside a script body.",
+                    ));
+                }
+                statement => {
+                    env.execute(statement, false)?;
+                }
+            }
+        }
+        Ok(())
+    })
+}
+
 fn append_element(
     element: &Element<'_>,
     body: &mut String,
     env: &mut Environment,
 ) -> Result<(), RuntimeError> {
+    // <script> content is JavaScript, not HTML: no escaping and no styling.
+    if element.kind == TokenType::Script {
+        body.push_str("<script>");
+        append_script_children(element, body, env)?;
+        body.push_str("</script>");
+        return Ok(());
+    }
+
     let tag = match element.kind {
         TokenType::Text => "h1",
         TokenType::Paragraph => "p",

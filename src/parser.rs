@@ -3,6 +3,11 @@ use crate::errors::ParseError;
 use crate::keyword_list::{is_attribute_keyword, is_element_keyword};
 use crate::token_types::{Token, TokenType};
 
+// Body diagnostics: control-flow bodies and script bodies both reject nested
+// elements, but the message names the body that was actually used.
+const CONTROL_BODY_ELEMENTS_ERROR: &str = "Elements are not allowed inside an if or while body";
+const SCRIPT_BODY_ELEMENTS_ERROR: &str = "Elements are not allowed inside a script body";
+
 // Recursive Descent Parser
 //
 // Grammar:
@@ -354,7 +359,7 @@ impl<'a> Parser<'a> {
         if !is_element_keyword(kind.token_type) {
             return Err(ParseError {
                 token: kind,
-                message: "Expected an element keyword (button, box, text, image, div, par)"
+                message: "Expected an element keyword (button, box, text, image, div, par, script)"
                     .to_string(),
             });
         }
@@ -365,8 +370,14 @@ impl<'a> Parser<'a> {
         let attributes = self.attribute_list()?;
         self.expect(TokenType::RightParen, "Expected ')' after attributes")?;
 
-        // Gets the children
-        let children = self.body(true, "element")?;
+        // A script body is JavaScript source, not HTML: statements and string
+        // expressions are allowed, but nested elements are a parse error.
+        let (allow_elements, body_name, elements_error) = if kind.token_type == TokenType::Script {
+            (false, "script", SCRIPT_BODY_ELEMENTS_ERROR)
+        } else {
+            (true, "element", CONTROL_BODY_ELEMENTS_ERROR)
+        };
+        let children = self.body(allow_elements, body_name, elements_error)?;
 
         Ok(Element {
             kind: kind.token_type,
@@ -378,11 +389,14 @@ impl<'a> Parser<'a> {
     // { children }: shared by element bodies and if/else bodies.
     // Newlines separate children; blank lines are skipped, and children may also
     // share a line. A bad child is recorded and skipped; the rest keeps parsing.
-    // `what` names the body in error messages ("element", "if", "else", "while").
+    // `what` names the body in error messages ("element", "if", "else", "while",
+    // "script"); `elements_error` is the message used when an element appears in
+    // a body that does not allow one.
     fn body(
         &mut self,
         allow_elements: bool,
         what: &str,
+        elements_error: &str,
     ) -> Result<Vec<TopLevel<'a>>, ParseError<'a>> {
         self.expect(
             TokenType::LeftBrace,
@@ -393,7 +407,7 @@ impl<'a> Parser<'a> {
             if self.consume_on_type(&[TokenType::Newline]) {
                 continue;
             }
-            match self.body_child(allow_elements) {
+            match self.body_child(allow_elements, elements_error) {
                 Ok(child) => children.push(child),
                 Err(err) => {
                     self.errors.push(err);
@@ -416,13 +430,13 @@ impl<'a> Parser<'a> {
         self.expect(TokenType::LeftParen, "Expected '(' after 'if'")?;
         let condition = self.expression()?;
         self.expect(TokenType::RightParen, "Expected ')' after if condition")?;
-        let then_branch = self.body(false, "if")?;
+        let then_branch = self.body(false, "if", CONTROL_BODY_ELEMENTS_ERROR)?;
         let else_branch = if self.consume_on_type(&[TokenType::Else]) {
             if self.consume_on_type(&[TokenType::If]) {
                 // else if: an else whose body is another if
                 Some(vec![self.if_statement()?])
             } else {
-                Some(self.body(false, "else")?)
+                Some(self.body(false, "else", CONTROL_BODY_ELEMENTS_ERROR)?)
             }
         } else {
             None
@@ -439,13 +453,18 @@ impl<'a> Parser<'a> {
         self.expect(TokenType::LeftParen, "Expected '(' after 'while'")?;
         let condition = self.expression()?;
         self.expect(TokenType::RightParen, "Expected ')' after while condition")?;
-        let body = self.body(false, "while")?;
+        let body = self.body(false, "while", CONTROL_BODY_ELEMENTS_ERROR)?;
         Ok(TopLevel::While { condition, body })
     }
 
     // one child of an element body: a nested element, a let, a print, or an expression
-    // (also if/else bodies, which pass allow_elements = false: statements only)
-    fn body_child(&mut self, allow_elements: bool) -> Result<TopLevel<'a>, ParseError<'a>> {
+    // (also if/else bodies and script bodies, which pass allow_elements = false:
+    // statements only)
+    fn body_child(
+        &mut self,
+        allow_elements: bool,
+        elements_error: &str,
+    ) -> Result<TopLevel<'a>, ParseError<'a>> {
         if self.is_type(TokenType::Render) {
             return Err(ParseError {
                 token: *self.peek(),
@@ -456,7 +475,7 @@ impl<'a> Parser<'a> {
             if !allow_elements {
                 return Err(ParseError {
                     token: *self.peek(),
-                    message: "Elements are not allowed inside an if or while body".to_string(),
+                    message: elements_error.to_string(),
                 });
             }
             Ok(TopLevel::Element(self.element()?))

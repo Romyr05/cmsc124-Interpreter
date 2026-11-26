@@ -6,6 +6,7 @@ pub fn keywords_lookup(word: &str) -> TokenType {
         "let" => TokenType::Initialize,
         "print" => TokenType::Print,
         "render" => TokenType::Render,
+        "script" => TokenType::Script,
         "if" => TokenType::If,
         "else" => TokenType::Else,
         "while" => TokenType::While,
@@ -46,6 +47,7 @@ pub fn is_element_keyword(token_type: TokenType) -> bool {
             | TokenType::Image
             | TokenType::Div
             | TokenType::Paragraph
+            | TokenType::Script
     )
 }
 
@@ -72,6 +74,7 @@ pub fn element_name(token_type: TokenType) -> &'static str {
         TokenType::Image => "image",
         TokenType::Div => "div",
         TokenType::Paragraph => "par",
+        TokenType::Script => "script",
         _ => "?element",
     }
 }

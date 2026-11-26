@@ -33,6 +33,7 @@ pub enum TokenType {
     Initialize,
     Print,
     Render,
+    Script,
     If,
     Else,
     While,
