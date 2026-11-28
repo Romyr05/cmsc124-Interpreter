@@ -1,0 +1,4 @@
+script() {
+  let greeting = "hi"
+  "console.log('" + greeting + "')"
+}   # expect: <!DOCTYPE html><html lang="html"><head></head><body><script>console.log('hi')</script></body></html>

@@ -1,0 +1,3 @@
+let t = text() { "Hello" }
+let card = div() { t }
+div() { card }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><div><div><h1>Hello</h1></div></div></body></html>

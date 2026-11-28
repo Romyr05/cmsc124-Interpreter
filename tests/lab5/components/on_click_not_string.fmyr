@@ -1,0 +1,1 @@
+button(on_click = 5) { "Go" }   # expect runtime error: on_click handler must be a string or a script component.

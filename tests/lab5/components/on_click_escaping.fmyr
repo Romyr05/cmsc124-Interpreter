@@ -1,0 +1,1 @@
+button(on_click = "if (1 < 2 && true) alert('ok')") { "Go" }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><button onclick="if (1 &lt; 2 &amp;&amp; true) alert('ok')">Go</button></body></html>

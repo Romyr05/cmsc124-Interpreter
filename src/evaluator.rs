@@ -8,8 +8,10 @@ use crate::token_types::{Token, TokenType};
 // Expression evaluation is an extension of the environment: it reads bindings
 // through Environment::lookup but does not own scope or statement execution.
 impl Environment {
-    // the one entry point: ask what node this is and do the matching thing
-    pub fn evaluate(&self, expr: &Expr) -> Result<Value, RuntimeError> {
+    // the one entry point: ask what node this is and do the matching thing.
+    // &mut because an element expression runs a body: it can declare bindings,
+    // assign, and push/pop scopes.
+    pub fn evaluate(&mut self, expr: &Expr) -> Result<Value, RuntimeError> {
         match expr {
             // literal: value was built during parsing, just hand it back
             Expr::Literal { value } => Ok(value.clone()),
@@ -34,10 +36,22 @@ impl Environment {
                     format!("Undefined variable '{}'.", name),
                 )),
             },
+            // Element literals are values. A script stores its raw JavaScript
+            // body so it can later be used as an event handler; every other
+            // component stores its rendered HTML fragment.
+            Expr::Element { element } => {
+                if element.kind == TokenType::Script {
+                    let script = crate::code_generator::generate_script_body(element, self)?;
+                    Ok(Value::Script(script))
+                } else {
+                    let html = crate::code_generator::generate_fragment(element, self)?;
+                    Ok(Value::Component(html))
+                }
+            }
         }
     }
 
-    fn eval_unary(&self, operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
+    fn eval_unary(&mut self, operator: &Token, right: &Expr) -> Result<Value, RuntimeError> {
         let right = self.evaluate(right)?; // operand first
         match operator.token_type {
             // arithmetic negation: operand must be a number
@@ -57,7 +71,7 @@ impl Environment {
     // this is short circuit same as module
     // and/or: evaluate left first; only evaluate right if left doesn't already decide the answer
     fn eval_logical(
-        &self,
+        &mut self,
         operator: &Token,
         left: &Expr,
         right: &Expr,
@@ -73,7 +87,7 @@ impl Environment {
     }
 
     fn eval_binary(
-        &self,
+        &mut self,
         operator: &Token,
         left: &Expr,
         right: &Expr,
@@ -177,12 +191,15 @@ fn number_operands(
     }
 }
 
-// how a value prints: numbers trimmed, strings unquoted, nil as "null"
+// how a value prints: numbers trimmed, strings unquoted, nil as "null".
+// Markup values print as the HTML they represent.
 pub fn stringify(value: &Value) -> String {
     match value {
         Value::Number(n) => format!("{}", n), // f64 Display prints 5, not 5.0
         Value::Str(s) => s.clone(),
         Value::Bool(b) => b.to_string(),
         Value::Nil => "null".to_string(),
+        Value::Component(html) => html.clone(),
+        Value::Script(js) => format!("<script>{}</script>", js),
     }
 }

@@ -1,0 +1,2 @@
+let c = div() { "x" }
+button(on_click = c) { "Go" }   # expect runtime error: on_click handler must be a string or a script component.

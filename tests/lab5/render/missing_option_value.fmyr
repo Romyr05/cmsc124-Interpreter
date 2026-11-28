@@ -1,0 +1,1 @@
+render(box() {}, title =)   # expect error: Expected expression

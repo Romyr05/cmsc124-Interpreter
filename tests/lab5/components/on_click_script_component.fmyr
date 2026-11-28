@@ -1,0 +1,2 @@
+let handler = script() { "alert('hi')" }
+button(on_click = handler) { "Go" }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><button onclick="alert('hi')">Go</button></body></html>

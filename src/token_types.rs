@@ -33,6 +33,7 @@ pub enum TokenType {
     Initialize,
     Print,
     Render,
+    Script,
     If,
     Else,
     While,
@@ -51,6 +52,7 @@ pub enum TokenType {
     StyleWidth,
     StyleColor,
     StyleBorder,
+    OnClick,
     Newline,
     Eof,
 }

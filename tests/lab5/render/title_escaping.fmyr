@@ -1,0 +1,1 @@
+render(box() {}, title = "A & B <C>")   # expect nothing

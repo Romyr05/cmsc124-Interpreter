@@ -1,0 +1,2 @@
+let name = "World"
+script() { "console.log('Hello, " + name + "')" }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><script>console.log('Hello, World')</script></body></html>

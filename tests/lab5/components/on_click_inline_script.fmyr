@@ -1,0 +1,1 @@
+button(on_click = script() { "alert('hi')" }) { "Go" }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><button onclick="alert('hi')">Go</button></body></html>

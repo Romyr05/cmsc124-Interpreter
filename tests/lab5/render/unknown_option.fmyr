@@ -1,0 +1,1 @@
+render(box() {}, nope = "x")   # expect error: Unknown render option 'nope'. Expected title or lang.

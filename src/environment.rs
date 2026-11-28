@@ -105,8 +105,12 @@ impl Environment {
             TopLevel::Print(expr) => println!("{}", stringify(&self.evaluate(expr)?)),
             // render builds one document, writes it beside the source file, and
             // ends interpretation by returning Flow::Stop.
-            TopLevel::Render { element, line } => {
-                render::render_element(element, self, *line)?;
+            TopLevel::Render {
+                component,
+                options,
+                line,
+            } => {
+                render::render_element(component, options, self, *line)?;
                 return Ok(Flow::Stop);
             }
             // a declaration prints nothing; on error the table is left as it was

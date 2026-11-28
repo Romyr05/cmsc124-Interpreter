@@ -1,0 +1,2 @@
+let b = button() { "Hi" }
+div() { b b }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><div><button>Hi</button><button>Hi</button></div></body></html>

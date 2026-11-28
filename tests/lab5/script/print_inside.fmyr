@@ -1,0 +1,5 @@
+script() {
+  "console.log('hi')"
+  print("from script")
+}   # expect: from script
+    # expect: <!DOCTYPE html><html lang="html"><head></head><body><script>console.log('hi')</script></body></html>

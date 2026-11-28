@@ -1,0 +1,10 @@
+let heading = "Interactive Demo"
+
+let hello = script() {
+  "alert('Hello!')"
+}
+
+render(div() {
+  text() { heading }
+  button(on_click = hello) { "Say hello" }
+}, title = heading, lang = "en")

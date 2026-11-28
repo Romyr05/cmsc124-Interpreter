@@ -6,6 +6,7 @@ pub fn keywords_lookup(word: &str) -> TokenType {
         "let" => TokenType::Initialize,
         "print" => TokenType::Print,
         "render" => TokenType::Render,
+        "script" => TokenType::Script,
         "if" => TokenType::If,
         "else" => TokenType::Else,
         "while" => TokenType::While,
@@ -33,6 +34,8 @@ pub fn keywords_lookup(word: &str) -> TokenType {
         "width" => TokenType::StyleWidth,
         "color" => TokenType::StyleColor,
         "border" => TokenType::StyleBorder,
+        // events
+        "on_click" => TokenType::OnClick,
         _ => TokenType::Identifier,
     }
 }
@@ -46,7 +49,12 @@ pub fn is_element_keyword(token_type: TokenType) -> bool {
             | TokenType::Image
             | TokenType::Div
             | TokenType::Paragraph
+            | TokenType::Script
     )
+}
+
+pub fn is_event_attribute(token_type: TokenType) -> bool {
+    matches!(token_type, TokenType::OnClick)
 }
 
 pub fn is_attribute_keyword(token_type: TokenType) -> bool {
@@ -61,7 +69,7 @@ pub fn is_attribute_keyword(token_type: TokenType) -> bool {
             | TokenType::StyleWidth
             | TokenType::StyleColor
             | TokenType::StyleBorder
-    )
+    ) || is_event_attribute(token_type)
 }
 
 pub fn element_name(token_type: TokenType) -> &'static str {
@@ -72,6 +80,7 @@ pub fn element_name(token_type: TokenType) -> &'static str {
         TokenType::Image => "image",
         TokenType::Div => "div",
         TokenType::Paragraph => "par",
+        TokenType::Script => "script",
         _ => "?element",
     }
 }
@@ -87,6 +96,15 @@ pub fn attribute_name(token_type: TokenType) -> &'static str {
         TokenType::StyleWidth => "width",
         TokenType::StyleColor => "color",
         TokenType::StyleBorder => "border",
+        TokenType::OnClick => "on_click",
         _ => "?attr",
+    }
+}
+
+// Maps a DSL event attribute to the HTML event-handler attribute it emits.
+pub fn event_html_name(token_type: TokenType) -> &'static str {
+    match token_type {
+        TokenType::OnClick => "onclick",
+        _ => "?event",
     }
 }

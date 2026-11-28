@@ -1,0 +1,1 @@
+render(box() {}, title = "a", title = "b")   # expect error: Duplicate render option 'title'.

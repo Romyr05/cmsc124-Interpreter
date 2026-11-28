@@ -1,7 +1,14 @@
-use crate::ast::{Attribute, Element, Expr, Value};
+use crate::ast::{Attribute, Element, Expr, RenderOption, RenderOptionKind, Value};
 use crate::errors::ParseError;
-use crate::keyword_list::{is_attribute_keyword, is_element_keyword};
+use crate::keyword_list::{
+    attribute_name, element_name, is_attribute_keyword, is_element_keyword, is_event_attribute,
+};
 use crate::token_types::{Token, TokenType};
+
+// Body diagnostics: control-flow bodies and script bodies both reject nested
+// elements, but the message names the body that was actually used.
+const CONTROL_BODY_ELEMENTS_ERROR: &str = "Elements are not allowed inside an if or while body";
+const SCRIPT_BODY_ELEMENTS_ERROR: &str = "Elements are not allowed inside a script body";
 
 // Recursive Descent Parser
 //
@@ -22,7 +29,7 @@ pub struct Parser<'a> {
     seen_render: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 //This just basically means a statemetn
 pub enum TopLevel<'a> {
     Expr(Expr<'a>),
@@ -36,10 +43,13 @@ pub enum TopLevel<'a> {
     },
     // print(expression): writes the value to the terminal, never into HTML
     Print(Expr<'a>),
-    // render(element): writes one complete HTML document to a sibling .html file
-    // and ends interpretation. Only valid at top level.
+    // render(component, options...): writes one complete HTML document to a
+    // sibling .html file and ends interpretation. Only valid at top level.
+    // The root is an expression so both element literals and component
+    // variables can be rendered.
     Render {
-        element: Box<Element<'a>>,
+        component: Expr<'a>,
+        options: Vec<RenderOption<'a>>,
         line: usize,
     },
     // name = value: updates the nearest existing binding; line points at the name
@@ -332,6 +342,14 @@ impl<'a> Parser<'a> {
                 })
             }
 
+            // an element literal used as a value, e.g. let b = button() { "Hi" }
+            t if is_element_keyword(t) => {
+                let element = self.element()?;
+                Ok(Expr::Element {
+                    element: Box::new(element),
+                })
+            }
+
             TokenType::LeftParen => {
                 self.advance();
                 let inner = self.expression()?;
@@ -353,7 +371,7 @@ impl<'a> Parser<'a> {
         if !is_element_keyword(kind.token_type) {
             return Err(ParseError {
                 token: kind,
-                message: "Expected an element keyword (button, box, text, image, div, par)"
+                message: "Expected an element keyword (button, box, text, image, div, par, script)"
                     .to_string(),
             });
         }
@@ -364,24 +382,53 @@ impl<'a> Parser<'a> {
         let attributes = self.attribute_list()?;
         self.expect(TokenType::RightParen, "Expected ')' after attributes")?;
 
-        // Gets the children
-        let children = self.body(true, "element")?;
+        // box and image emit only their contents, and script has no HTML tag of
+        // its own for an event handler to attach to.
+        if matches!(
+            kind.token_type,
+            TokenType::Box | TokenType::Image | TokenType::Script
+        ) && let Some(attribute) = attributes
+            .iter()
+            .find(|attribute| is_event_attribute(attribute.kind))
+        {
+            return Err(ParseError {
+                token: kind,
+                message: format!(
+                    "{} is not supported on {} yet.",
+                    attribute_name(attribute.kind),
+                    element_name(kind.token_type)
+                ),
+            });
+        }
+
+        // A script body is JavaScript source, not HTML: statements and string
+        // expressions are allowed, but nested elements are a parse error.
+        let (allow_elements, body_name, elements_error) = if kind.token_type == TokenType::Script {
+            (false, "script", SCRIPT_BODY_ELEMENTS_ERROR)
+        } else {
+            (true, "element", CONTROL_BODY_ELEMENTS_ERROR)
+        };
+        let children = self.body(allow_elements, body_name, elements_error)?;
 
         Ok(Element {
             kind: kind.token_type,
             attributes,
             children,
+            line: kind.line,
         })
     }
 
     // { children }: shared by element bodies and if/else bodies.
     // Newlines separate children; blank lines are skipped, and children may also
     // share a line. A bad child is recorded and skipped; the rest keeps parsing.
-    // `what` names the body in error messages ("element", "if", "else", "while").
+    // `what` names the body in error messages ("element", "if", "else", "while",
+    // "script"); `elements_error` is the message used when an element appears in
+    // a body that does not allow one.
     fn body(
         &mut self,
         allow_elements: bool,
         what: &str,
+        elements_error: &str,
     ) -> Result<Vec<TopLevel<'a>>, ParseError<'a>> {
         self.expect(
             TokenType::LeftBrace,
@@ -392,7 +439,7 @@ impl<'a> Parser<'a> {
             if self.consume_on_type(&[TokenType::Newline]) {
                 continue;
             }
-            match self.body_child(allow_elements) {
+            match self.body_child(allow_elements, elements_error) {
                 Ok(child) => children.push(child),
                 Err(err) => {
                     self.errors.push(err);
@@ -415,13 +462,13 @@ impl<'a> Parser<'a> {
         self.expect(TokenType::LeftParen, "Expected '(' after 'if'")?;
         let condition = self.expression()?;
         self.expect(TokenType::RightParen, "Expected ')' after if condition")?;
-        let then_branch = self.body(false, "if")?;
+        let then_branch = self.body(false, "if", CONTROL_BODY_ELEMENTS_ERROR)?;
         let else_branch = if self.consume_on_type(&[TokenType::Else]) {
             if self.consume_on_type(&[TokenType::If]) {
                 // else if: an else whose body is another if
                 Some(vec![self.if_statement()?])
             } else {
-                Some(self.body(false, "else")?)
+                Some(self.body(false, "else", CONTROL_BODY_ELEMENTS_ERROR)?)
             }
         } else {
             None
@@ -438,13 +485,18 @@ impl<'a> Parser<'a> {
         self.expect(TokenType::LeftParen, "Expected '(' after 'while'")?;
         let condition = self.expression()?;
         self.expect(TokenType::RightParen, "Expected ')' after while condition")?;
-        let body = self.body(false, "while")?;
+        let body = self.body(false, "while", CONTROL_BODY_ELEMENTS_ERROR)?;
         Ok(TopLevel::While { condition, body })
     }
 
     // one child of an element body: a nested element, a let, a print, or an expression
-    // (also if/else bodies, which pass allow_elements = false: statements only)
-    fn body_child(&mut self, allow_elements: bool) -> Result<TopLevel<'a>, ParseError<'a>> {
+    // (also if/else bodies and script bodies, which pass allow_elements = false:
+    // statements only)
+    fn body_child(
+        &mut self,
+        allow_elements: bool,
+        elements_error: &str,
+    ) -> Result<TopLevel<'a>, ParseError<'a>> {
         if self.is_type(TokenType::Render) {
             return Err(ParseError {
                 token: *self.peek(),
@@ -455,7 +507,7 @@ impl<'a> Parser<'a> {
             if !allow_elements {
                 return Err(ParseError {
                     token: *self.peek(),
-                    message: "Elements are not allowed inside an if or while body".to_string(),
+                    message: elements_error.to_string(),
                 });
             }
             Ok(TopLevel::Element(self.element()?))
@@ -482,12 +534,37 @@ impl<'a> Parser<'a> {
             return Ok(attributes);
         }
 
-        attributes.push(self.attribute()?);
+        Self::push_attribute(&mut attributes, self.attribute()?)?;
         while self.consume_on_type(&[TokenType::Comma]) {
-            attributes.push(self.attribute()?);
+            Self::push_attribute(&mut attributes, self.attribute()?)?;
         }
 
         Ok(attributes)
+    }
+
+    // Event attributes may appear at most once per element. Other attributes
+    // keep their existing behavior (for example, duplicate color declarations
+    // simply contribute two CSS declarations).
+    fn push_attribute(
+        attributes: &mut Vec<Attribute<'a>>,
+        attribute: Attribute<'a>,
+    ) -> Result<(), ParseError<'a>> {
+        if is_event_attribute(attribute.kind)
+            && attributes
+                .iter()
+                .any(|existing| existing.kind == attribute.kind)
+        {
+            return Err(ParseError {
+                token: Token::new(
+                    attribute.kind,
+                    attribute_name(attribute.kind),
+                    attribute.line,
+                ),
+                message: format!("Duplicate attribute '{}'.", attribute_name(attribute.kind)),
+            });
+        }
+        attributes.push(attribute);
+        Ok(())
     }
 
     fn attribute(&mut self) -> Result<Attribute<'a>, ParseError<'a>> {
@@ -496,7 +573,7 @@ impl<'a> Parser<'a> {
             return Err(ParseError {
                 token: kind,
                 message: "Expected an attribute name (id, class, align, padding, margin, \
-                          height, width, color, border)"
+                          height, width, color, border, on_click)"
                     .to_string(),
             });
         }
@@ -508,6 +585,7 @@ impl<'a> Parser<'a> {
         Ok(Attribute {
             kind: kind.token_type,
             value,
+            line: kind.line,
         })
     }
 
@@ -630,8 +708,9 @@ impl<'a> Parser<'a> {
         Ok(TopLevel::Print(expr))
     }
 
-    // render ( element )   (the `render` was already consumed)
-    // The element is required: render() and render(expression) are errors.
+    // render ( expression ( "," renderOption )* )   (the `render` was already consumed)
+    // The root is required. It can be an element literal or a component variable;
+    // the value is checked at runtime to be a component.
     fn render_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
         let keyword = *self.previous();
         if self.seen_render {
@@ -643,18 +722,55 @@ impl<'a> Parser<'a> {
         self.seen_render = true;
 
         self.expect(TokenType::LeftParen, "Expected '(' after 'render'")?;
-        if !is_element_keyword(self.peek().token_type) {
+        if self.is_type(TokenType::RightParen) {
             return Err(ParseError {
                 token: *self.peek(),
                 message: "render() expects an element argument".to_string(),
             });
         }
-        let element = self.element()?;
+        let component = self.expression()?;
+        let options = self.render_options()?;
         self.expect(TokenType::RightParen, "Expected ')' after render element")?;
         Ok(TopLevel::Render {
-            element: Box::new(element),
+            component,
+            options,
             line: keyword.line,
         })
+    }
+
+    // ( "," IDENTIFIER "=" expression )* after the render component.
+    // title and lang stay ordinary identifiers everywhere outside this list.
+    fn render_options(&mut self) -> Result<Vec<RenderOption<'a>>, ParseError<'a>> {
+        let mut options: Vec<RenderOption<'a>> = Vec::new();
+        while self.consume_on_type(&[TokenType::Comma]) {
+            let name = *self.expect(
+                TokenType::Identifier,
+                "Expected render option name after ','",
+            )?;
+            let kind = match name.lexeme {
+                "title" => RenderOptionKind::Title,
+                "lang" => RenderOptionKind::Lang,
+                _ => {
+                    return Err(ParseError {
+                        token: name,
+                        message: format!(
+                            "Unknown render option '{}'. Expected title or lang.",
+                            name.lexeme
+                        ),
+                    });
+                }
+            };
+            if options.iter().any(|option| option.kind == kind) {
+                return Err(ParseError {
+                    token: name,
+                    message: format!("Duplicate render option '{}'.", name.lexeme),
+                });
+            }
+            self.expect(TokenType::Equal, "Expected '=' after render option name")?;
+            let value = self.expression()?;
+            options.push(RenderOption { kind, value });
+        }
+        Ok(options)
     }
 
     // error recovery: discard tokens up to and including the next newline,

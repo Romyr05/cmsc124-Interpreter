@@ -1,0 +1,1 @@
+render(box() {}, title = "a" lang = "en")   # expect error: Expected ')' after render element

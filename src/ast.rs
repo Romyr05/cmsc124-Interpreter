@@ -8,18 +8,57 @@ pub enum Value {
     Str(String), // owned, so Value needs no lifetime
     Bool(bool),
     Nil,
+    // A component literal rendered to an HTML fragment. It is trusted markup:
+    // when used as a child it is inserted raw instead of being HTML-escaped.
+    Component(String),
+    // A script component's raw JavaScript body. It renders as <script>...</script>
+    // when used as a child, and can later be used directly as an event handler.
+    Script(String),
 }
 
-#[derive(Debug)]
+impl Value {
+    // Markup values are already generated HTML/JS and bypass text escaping.
+    pub fn is_markup(&self) -> bool {
+        matches!(self, Value::Component(_) | Value::Script(_))
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Element<'a> {
     pub kind: TokenType,
     pub attributes: Vec<Attribute<'a>>,
     pub children: Vec<TopLevel<'a>>,
+    // line of the element keyword, used for diagnostics about the element itself
+    pub line: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Attribute<'a> {
     pub kind: TokenType,
+    pub value: Expr<'a>,
+    // line of the attribute name, used for diagnostics that point at the attribute
+    pub line: usize,
+}
+
+// Named document options on render(...): title = "..." and lang = "...".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RenderOptionKind {
+    Title,
+    Lang,
+}
+
+impl RenderOptionKind {
+    pub fn name(self) -> &'static str {
+        match self {
+            RenderOptionKind::Title => "title",
+            RenderOptionKind::Lang => "lang",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RenderOption<'a> {
+    pub kind: RenderOptionKind,
     pub value: Expr<'a>,
 }
 
@@ -44,5 +83,9 @@ pub enum Expr<'a> {
     Variable {
         name: String,
         line: usize,
+    },
+    // an element literal used as a value: let b = button() { "Hi" }
+    Element {
+        element: Box<Element<'a>>,
     },
 }

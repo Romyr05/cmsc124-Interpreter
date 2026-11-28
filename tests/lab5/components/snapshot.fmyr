@@ -1,0 +1,4 @@
+let label = "one"
+let b = button() { label }
+label = "two"
+div() { b }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><div><button>one</button></div></body></html>

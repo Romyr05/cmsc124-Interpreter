@@ -1,0 +1,5 @@
+let helpers = script() { "function greet() { alert('hi') }" }
+render(div() {
+  button(on_click = "greet()") { "Go" }
+  helpers
+}, title = "Shared")   # expect nothing

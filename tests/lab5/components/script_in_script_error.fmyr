@@ -1,0 +1,5 @@
+let s = script() { "console.log('hi')" }
+script() {
+  let t = s
+  t   # expect runtime error: Components are not allowed inside a script body.
+}

@@ -1,0 +1,2 @@
+let handler = script() { "alert('hi')" }
+render(button(on_click = handler) { "Go" }, title = "Click")   # expect nothing
