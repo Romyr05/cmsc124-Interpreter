@@ -58,11 +58,11 @@ Program output goes to stdout; diagnostics go to stderr.
 
 #### Components
 
-The parser recognizes `div`, `text`, `par`, `button`, `box`, `image`, and
-`script`. `div`, `text`, `par`, `button`, and `script` render tags; `box` and
-`image` currently emit only their contents. The broader component catalog below
-includes planned features; entries beyond those seven are not recognized as
-element keywords yet.
+The parser recognizes `div`, `text`, `par`, `button`, `box`, `image`, `script`,
+and `style`. `div`, `text`, `par`, `button`, `script`, and `style` render tags;
+`box` and `image` currently emit only their contents. The broader component
+catalog below includes planned features; entries beyond those eight are not
+recognized as element keywords yet.
 
 | Keyword | function |
 |---|---|
@@ -72,7 +72,8 @@ element keywords yet.
 | `box` | similar to div but predetermined height and width |
 | `image` | parsed element; image rendering is planned |
 | `par` | paragraph rendered as `<p>` |
-| `script` | inline JavaScript rendered raw inside `<script>` |
+| `script` | JavaScript, written in the body or linked with `src`, placed at the end of `<body>` |
+| `style` | CSS, written in the body or linked with `src`, placed in `<head>` |
 | `input` | text entry field |
 | `checkbox` | boolean toggle component |
 | `radio` | single-select option among a group |
@@ -97,6 +98,7 @@ HTML generator.
 | `class` | class attribute, identifies common components
 | `color` | CSS text color, computed from an expression in the enclosing scope
 | `on_click` | inline JavaScript click handler, from a string or script component
+| `src` | on `script` and `style` only: a file whose text is inlined as the element's content
 | `align` | align style attribute, can be set to start, center, end
 | `padding` | padding style attribute, can be set to integer values
 | `margin` | margin style attribute, can be set to integer values
@@ -207,11 +209,13 @@ assignment  -> IDENTIFIER "=" expression
 exprStmt    -> expression
 
 element     -> ELEMENT "(" attributes? ")" "{" body "}"
+             | ( "script" | "style" ) "(" attributes ")"   # only when attributes include src
 ELEMENT     -> "button" | "box" | "text" | "image" | "div" | "par" | "script"
+             | "style"
 attributes  -> attribute ( "," attribute )*
 attribute   -> ATTRIBUTE "=" expression
 ATTRIBUTE   -> "id" | "class" | "align" | "padding" | "margin"
-             | "height" | "width" | "color" | "border" | "on_click"
+             | "height" | "width" | "color" | "border" | "on_click" | "src"
 body        -> ( child | NEWLINE )*
 child       -> element | ifStmt | whileStmt | letDecl | printStmt
              | assignment | exprStmt
@@ -269,7 +273,7 @@ enum Value {
     Str(String),
     Bool(bool),
     Nil,
-    Component(String), // generated HTML fragment
+    Component(Markup), // generated head CSS, body HTML, and end-of-body JS
     Script(String),    // raw JavaScript body
 }
 ```
@@ -284,10 +288,12 @@ floating-point precision even when a source literal looks like an integer.
 Operands are evaluated left to right, except when `and` or `or` short-circuits.
 
 `Component` and `Script` are the two component value kinds. A `Component` holds
-an already-generated HTML fragment. A `Script` holds a script element's raw
-JavaScript body; it renders as `<script>...</script>` when used as a child. Both
-are markup values and are inserted raw when they appear in an element body,
-unlike strings, which are HTML-escaped.
+already-generated `Markup` in three parts: CSS for `<head>`, HTML for the body
+in source order, and JavaScript for the end of `<body>`. A `Script` holds a
+script element's raw JavaScript body; used as a child it adds
+`<script>...</script>` to the end part. Both are markup values: inserted into an
+element body, each part is appended raw to the matching part of the page, unlike
+strings, which are HTML-escaped.
 
 ### Value printing
 
@@ -295,7 +301,8 @@ unlike strings, which are HTML-escaped.
 - Null: `null` (represented internally by `Value::Nil`).
 - Booleans: `true` or `false`.
 - Strings: without quotes, so `"hi"` prints `hi`.
-- Components: the stored HTML fragment, without an added document wrapper.
+- Components: the stored CSS, HTML, and JavaScript parts joined in that order,
+  without an added document wrapper.
 - Script components: `<script>` followed by the raw JavaScript and `</script>`.
 
 ### Components as values
@@ -380,7 +387,7 @@ pass it to `render`.
   be an element literal or a variable holding a component:
   - `render(div() { text() { "Hello" } })`
   - `let card = div() { text() { "Hello" } }` then `render(card, title = "Card")`
-  - A script component renders as `<script>...</script>` in the document body.
+  - A script component renders as `<script>...</script>` at the end of the body.
   - `render()` is a parse error. A non-component value such as `render(5)` is a
     runtime error (exit 70): `render() expects an element or a component value.`
 - Optional named parameters customize the document boilerplate:
@@ -389,8 +396,12 @@ pass it to `render`.
   - `lang`: evaluated in the enclosing scope, converted with the normal value-printing
     rules, HTML-escaped, and used for `<html lang="...">`. The default remains `"html"`.
   - Parameters may appear in any order after the component. Unknown, duplicate, or
-    malformed parameters are parse errors (exit 65). With no parameters, the document
-    wrapper is unchanged: `<head></head>` and `<html lang="html">`.
+    malformed parameters are parse errors (exit 65). With no parameters and no
+    `style` elements, the document wrapper is unchanged: `<head></head>` and
+    `<html lang="html">`.
+- Document layout: `<head>` holds the title, then every collected `<style>` in
+  source order. `<body>` holds the HTML, then every collected `<script>` in source
+  order.
   - Parameter expressions run before the component expression, so they cannot read
     bindings declared inside an inline element body. A component variable was
     already evaluated when its binding ran, so its snapshot is unaffected.
@@ -412,6 +423,9 @@ pass it to `render`.
   `</script>`. Expression values use the normal value-printing rules and are inserted
   **raw**, without HTML escaping. Consecutive expression values are separated by a
   newline so separate DSL strings do not merge into one JavaScript statement.
+- Placement: every script, wherever it is written, is moved to the end of
+  `<body>`, after all HTML content, in source order. Scripts usually look up page
+  elements, and those exist only after the browser has read them.
 - A top-level script prints a complete default document to stdout, like any other
   element. To attach JavaScript to a rendered page, nest the script inside the
   element passed to `render`.
@@ -428,10 +442,59 @@ pass it to `render`.
   bare expressions inside `if`/`while` bodies are evaluated and discarded. To build
   conditional or repeated JavaScript, accumulate it in a string variable and expose
   that variable as the final expression.
-- Attributes are parsed but ignored, and no external `src` support exists yet.
+- `src` links a JavaScript file instead of writing it in the body; see
+  [src](#src). Other non-event attributes are parsed but ignored.
 - Strings keep the normal literal rules: no escape decoding, and literal newlines
   are allowed. Use single quotes for JavaScript string literals. A literal
   `</script>` in the JavaScript closes the HTML tag early; it is not escaped.
+
+### style
+
+- Syntax: `style() { ... }`, usable anywhere an element is allowed. The body is
+  raw CSS, with the same rules as a `script` body: expression values are inserted
+  without escaping and separated by newlines, nested elements are a parse error
+  (`Elements are not allowed inside a style body`), and a component value used
+  as a direct expression is a runtime error.
+- Placement: every style is collected into `<head>`, wherever it is written, so
+  the browser applies it before drawing the page.
+- A style is a component value like any element: `let theme = style() { "..." }`
+  then using `theme` inside an element adds its CSS to `<head>`. Reusing the
+  same component twice adds its CSS twice.
+- `on_click` is rejected on `style` (no visible tag to attach to).
+- `style` is a keyword, so it cannot be a binding name.
+
+### src
+
+- Syntax: `script(src = expression)` or `style(src = expression)`. With `src`
+  the `{ }` may be left out, since the element only links a file; an empty
+  `{ }` is also accepted. Without `src`, the body is the content and `{ }` is
+  required (`Expected '{' to start style body`, exit 65).
+- Content rule: `src` and no body reads the file; no `src` uses the body; `src`
+  together with a non-empty body is a parse error (exit 65), to avoid deciding
+  which one wins: `script with src must have an empty body.`
+- The expression must evaluate to a string path; anything else is a runtime error
+  (exit 70): `src must be a string.`
+- The path is relative to the running `.fmyr` file's folder, which is also where
+  `render` writes the `.html`. In the REPL, with no source file, it is relative
+  to the current folder. Absolute paths are used as given.
+- The file is read and **inlined** when the element runs: its text becomes the
+  element's content, placed like any other script or style. The generated page
+  stays one self-contained file and does not need the linked file afterwards.
+- A file that cannot be read is a runtime error (exit 70):
+  `Cannot read file 'assets/missing.css'.`
+- A file containing its own closing tag (`</script` or `</style`, any letter
+  case) is a runtime error (exit 70), because the inlined text would end the
+  block early: `File 'x.js' contains '</script>', which cannot be inlined.`
+- `src` is allowed only on `script` and `style`; elsewhere it is a parse error:
+  `src is only allowed on script and style, not div.` A second `src` on the same
+  element is a parse error: `Duplicate attribute 'src'.`
+- A script component with `src` stores the file's JavaScript, so it can also be
+  an `on_click` handler: `let h = script(src = "handler.js")`.
+- Example: `tests/lab5/render/linked_assets.fmyr` writes
+
+  ```html
+  <!DOCTYPE html><html lang="en"><head><title>Assets</title><style>h1 { color: blue; }</style></head><body><div><h1>Linked</h1></div><script>console.log('linked')</script></body></html>
+  ```
 
 ### on_click
 
@@ -625,7 +688,7 @@ tracked in issue #74.
 | tests/lab2 | Parser | sidecar | `--parse` |
 | tests/lab3 | Evaluator | inline | `--eval` |
 | tests/lab4 | Context | inline | none |
-| tests/lab5 | Control flow, render options, script elements, components, and on_click | inline | none |
+| tests/lab5 | Control flow, render options, script and style elements, linked files, components, and on_click | inline | none |
 
 
 Parser recovery cases run through the same annotated file harness in
@@ -773,9 +836,12 @@ would each need a larger evaluation model, so they remain future work.
 - Direct element statements are still rejected inside `if`/`while` and script
   bodies; element expressions may be used there as values. Component values used
   as script expressions are a runtime error.
-- `script` content is emitted raw; external scripts (`src`) and `</script>`
-  escaping are not implemented. Its non-event attributes are parsed but ignored;
-  event attributes on `script` are rejected.
+- `script` and `style` content written in the body is emitted raw; a literal
+  closing tag in it is not escaped. Linked files are checked for their closing
+  tag instead. Non-event attributes other than `src` are parsed but ignored;
+  event attributes on `script` and `style` are rejected.
+- `src` inlines files; it never emits `<script src>` or `<link>` tags, so
+  remote URLs are not supported.
 - Extremely deep expressions can overflow the host stack (#53).
 
 ## Changelog
@@ -787,6 +853,6 @@ would each need a larger evaluation model, so they remain future work.
 | 1PR1 | defined valid tokens and operators (ie. Grammars) |
 | 1PR2 | expanded on keywords and allowed tokenizer to detect them |
 | Lab 4 | Mutable bindings, lexical body scopes, explicit printing, file execution, and scoped button colors. |
-| Lab 5 | `render(element, title = ..., lang = ...)` customizes the document wrapper and ends interpretation; `script() {}` embeds raw JavaScript. |
+| Lab 5 | `render(element, title = ..., lang = ...)` customizes the document wrapper and ends interpretation; `script() {}` embeds raw JavaScript; `style() {}` embeds CSS into `<head>`; `src` inlines linked `.js`/`.css` files; all scripts move to the end of `<body>`. |
 | Components | Element literals are expressions; `let`/assignment can bind any component; component values are inserted raw as children; `render` accepts an element or component variable; script components retain raw JavaScript. |
 | Events | `on_click = <string or script component>` emits an inline `onclick` handler on `button`, `div`, `text`, and `par`. |

@@ -1,2 +1,2 @@
 let s = script() { "console.log('hi')" }
-div() { s }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><div><script>console.log('hi')</script></div></body></html>
+div() { s }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><div></div><script>console.log('hi')</script></body></html>

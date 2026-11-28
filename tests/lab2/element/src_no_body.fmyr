@@ -1,0 +1,2 @@
+style(src = "page.css")
+script(src = "app.js")

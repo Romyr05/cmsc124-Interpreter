@@ -1,0 +1,1 @@
+script(src = "assets/app.js") { "extra()" }   # expect error: script with src must have an empty body.

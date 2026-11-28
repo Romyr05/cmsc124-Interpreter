@@ -1,10 +1,11 @@
-use crate::ast::{Element, Value};
+use crate::ast::{Attribute, Element, Markup, Value, script_tag, style_tag};
 use crate::environment::Environment;
 use crate::errors::RuntimeError;
 use crate::evaluator::stringify;
-use crate::keyword_list::{attribute_name, event_html_name, is_event_attribute};
+use crate::keyword_list::{attribute_name, element_name, event_html_name, is_event_attribute};
 use crate::parser::TopLevel;
 use crate::token_types::TokenType;
+use std::path::Path;
 
 // Values for the document wrapper around a rendered element. `Default` keeps
 // the original boilerplate, so top-level elements and old tests are unchanged.
@@ -25,7 +26,7 @@ impl Default for DocumentOptions {
 
 fn append_children(
     element: &Element<'_>,
-    body: &mut String,
+    out: &mut Markup,
     escape_text: bool,
     env: &mut Environment,
 ) -> Result<(), RuntimeError> {
@@ -38,19 +39,20 @@ fn append_children(
                 TopLevel::Expr(expr) => {
                     let value = env.evaluate(expr)?;
                     // Component values are generated markup, not user text:
-                    // insert them raw so a bound button/div keeps its tags.
-                    if value.is_markup() {
-                        body.push_str(&stringify(&value));
+                    // insert their parts raw so a bound button/div keeps its
+                    // tags and its styles/scripts still reach head and end.
+                    if let Some(markup) = value.as_markup() {
+                        out.append(&markup);
                     } else {
                         let text = stringify(&value);
                         if escape_text {
-                            body.push_str(&escape_html(&text));
+                            out.body.push_str(&escape_html(&text));
                         } else {
-                            body.push_str(&text);
+                            out.body.push_str(&text);
                         }
                     }
                 }
-                TopLevel::Element(element) => append_element(element, body, env)?,
+                TopLevel::Element(element) => append_element(element, out, env)?,
                 // every other child is a statement (print, let, assignment), run by the
                 // shared executor in this body's scope. print goes straight to the
                 // terminal, never into body (the HTML), so its line appears before the
@@ -66,26 +68,27 @@ fn append_children(
     })
 }
 
-// Script bodies are raw text: expression values go straight into <script>,
-// with a newline between consecutive chunks so separate DSL strings do not
-// silently merge into one JavaScript line.
-fn append_script_children(
+// Script and style bodies are raw text: expression values go straight into
+// <script>/<style>, with a newline between consecutive chunks so separate DSL
+// strings do not silently merge into one line.
+fn append_raw_children(
     element: &Element<'_>,
     body: &mut String,
     env: &mut Environment,
 ) -> Result<(), RuntimeError> {
+    let name = element_name(element.kind);
     env.in_new_scope(|env| {
         let mut wrote_expression = false;
         for child in &element.children {
             match child {
                 TopLevel::Expr(expr) => {
                     let value = env.evaluate(expr)?;
-                    // A script body is JavaScript source, not an HTML parent:
-                    // inserting a component here would emit tags into JS.
+                    // A script/style body is source code, not an HTML parent:
+                    // inserting a component here would emit tags into JS/CSS.
                     if value.is_markup() {
                         return Err(RuntimeError::new(
                             element.line,
-                            "Components are not allowed inside a script body.",
+                            format!("Components are not allowed inside a {} body.", name),
                         ));
                     }
                     if wrote_expression {
@@ -94,12 +97,12 @@ fn append_script_children(
                     body.push_str(&stringify(&value));
                     wrote_expression = true;
                 }
-                // The parser rejects nested elements inside script bodies.
+                // The parser rejects nested elements inside script/style bodies.
                 // This arm only protects the generator if that invariant breaks.
                 TopLevel::Element(_) => {
                     return Err(RuntimeError::new(
                         0,
-                        "Elements are not allowed inside a script body.",
+                        format!("Elements are not allowed inside a {} body.", name),
                     ));
                 }
                 statement => {
@@ -111,17 +114,78 @@ fn append_script_children(
     })
 }
 
+// The JavaScript or CSS text of a script/style element: the linked file when
+// it has src, otherwise its body.
+fn raw_source(element: &Element<'_>, env: &mut Environment) -> Result<String, RuntimeError> {
+    match element
+        .attributes
+        .iter()
+        .find(|attribute| attribute.kind == TokenType::Src)
+    {
+        Some(src) => read_linked(element, src, env),
+        None => {
+            let mut text = String::new();
+            append_raw_children(element, &mut text, env)?;
+            Ok(text)
+        }
+    }
+}
+
+// Read a src file so its text can be inlined. The path is relative to the
+// running .fmyr file (the folder render() writes into); the REPL has no source
+// file, so there it is relative to the current folder.
+fn read_linked(
+    element: &Element<'_>,
+    src: &Attribute<'_>,
+    env: &mut Environment,
+) -> Result<String, RuntimeError> {
+    let Value::Str(path) = env.evaluate(&src.value)? else {
+        return Err(RuntimeError::new(src.line, "src must be a string."));
+    };
+    let base = env
+        .source_path()
+        .and_then(Path::parent)
+        .map(Path::to_path_buf)
+        .unwrap_or_default();
+    let text = std::fs::read_to_string(base.join(&path))
+        .map_err(|_| RuntimeError::new(src.line, format!("Cannot read file '{}'.", path)))?;
+
+    // Inlined text that contains the closing tag would end the block early and
+    // spill the rest of the file into the page.
+    let closing = format!("</{}", element_name(element.kind));
+    if text.to_ascii_lowercase().contains(&closing) {
+        return Err(RuntimeError::new(
+            src.line,
+            format!(
+                "File '{}' contains '{}>', which cannot be inlined.",
+                path, closing
+            ),
+        ));
+    }
+    Ok(text)
+}
+
 fn append_element(
     element: &Element<'_>,
-    body: &mut String,
+    out: &mut Markup,
     env: &mut Environment,
 ) -> Result<(), RuntimeError> {
-    // <script> content is JavaScript, not HTML: no escaping and no styling.
-    if element.kind == TokenType::Script {
-        body.push_str("<script>");
-        append_script_children(element, body, env)?;
-        body.push_str("</script>");
-        return Ok(());
+    // Script and style content is source code, not HTML: no escaping and no
+    // styling. JavaScript is collected at the end of <body> so it runs after
+    // every element exists; CSS is collected into <head> so it applies before
+    // the page is drawn.
+    match element.kind {
+        TokenType::Script => {
+            let javascript = raw_source(element, env)?;
+            out.end.push_str(&script_tag(&javascript));
+            return Ok(());
+        }
+        TokenType::Style => {
+            let css = raw_source(element, env)?;
+            out.head.push_str(&style_tag(&css));
+            return Ok(());
+        }
+        _ => {}
     }
 
     let tag = match element.kind {
@@ -129,9 +193,10 @@ fn append_element(
         TokenType::Paragraph => "p",
         TokenType::Div => "div",
         TokenType::Button => "button",
-        _ => return append_children(element, body, false, env),
+        _ => return append_children(element, out, false, env),
     };
 
+    let body = &mut out.body;
     body.push('<');
     body.push_str(tag);
     let mut style = String::new();
@@ -181,10 +246,10 @@ fn append_element(
         body.push('"');
     }
     body.push('>');
-    append_children(element, body, true, env)?;
-    body.push_str("</");
-    body.push_str(tag);
-    body.push('>');
+    append_children(element, out, true, env)?;
+    out.body.push_str("</");
+    out.body.push_str(tag);
+    out.body.push('>');
     Ok(())
 }
 
@@ -206,41 +271,45 @@ fn escape_attribute(text: &str) -> String {
         .replace('>', "&gt;")
 }
 
-// Render only the element's own HTML, without the document wrapper. Component
-// values use this so they can be inserted into another element or render().
+// Render only the element's own markup, without the document wrapper.
+// Component values use this so they can be inserted into another element or
+// render().
 pub fn generate_fragment(
     element: &Element<'_>,
     env: &mut Environment,
-) -> Result<String, RuntimeError> {
-    let mut body = String::new();
-    append_element(element, &mut body, env)?;
-    Ok(body)
+) -> Result<Markup, RuntimeError> {
+    let mut out = Markup::default();
+    append_element(element, &mut out, env)?;
+    Ok(out)
 }
 
-// Render only a script element's body, without the <script> tags. Script
-// components keep this raw JavaScript so it can later become an event handler.
+// Render only a script element's JavaScript, without the <script> tags (its
+// linked file when it has src). Script components keep this raw JavaScript so
+// it can later become an event handler.
 pub fn generate_script_body(
     element: &Element<'_>,
     env: &mut Environment,
 ) -> Result<String, RuntimeError> {
-    let mut body = String::new();
-    append_script_children(element, &mut body, env)?;
-    Ok(body)
+    raw_source(element, env)
 }
 
-// Wrap an already-generated body in the document boilerplate.
-pub fn wrap_document(body: &str, options: &DocumentOptions) -> String {
-    // Defaults produce exactly <head></head>; only an explicit title adds a tag.
-    let head = match &options.title {
+// Wrap already-generated markup in the document boilerplate: collected CSS
+// after the title in <head>, collected JavaScript after the body content.
+pub fn wrap_document(markup: &Markup, options: &DocumentOptions) -> String {
+    // Defaults produce exactly <head></head>; only an explicit title or
+    // collected styles add content.
+    let title = match &options.title {
         Some(title) => format!("<title>{}</title>", escape_html(title)),
         None => String::new(),
     };
 
     format!(
-        "<!DOCTYPE html><html lang=\"{}\"><head>{}</head><body>{}</body></html>",
+        "<!DOCTYPE html><html lang=\"{}\"><head>{}{}</head><body>{}{}</body></html>",
         escape_html(&options.lang),
-        head,
-        body
+        title,
+        markup.head,
+        markup.body,
+        markup.end
     )
 }
 
@@ -258,6 +327,6 @@ pub fn generate_document(
     env: &mut Environment,
     options: &DocumentOptions,
 ) -> Result<String, RuntimeError> {
-    let body = generate_fragment(element, env)?;
-    Ok(wrap_document(&body, options))
+    let markup = generate_fragment(element, env)?;
+    Ok(wrap_document(&markup, options))
 }

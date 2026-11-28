@@ -1,0 +1,1 @@
+style(src = "a.css", src = "b.css") { }   # expect error: Duplicate attribute 'src'.

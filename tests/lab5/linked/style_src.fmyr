@@ -1,0 +1,2 @@
+# a linked CSS file is read and inlined into <head>
+div() { style(src = "assets/page.css") { } text() { "Hi" } }   # expect: <!DOCTYPE html><html lang="html"><head><style>h1 { color: blue; }</style></head><body><div><h1>Hi</h1></div></body></html>

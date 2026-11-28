@@ -1,0 +1,7 @@
+# a bound component keeps its style and script, which still reach head and end
+let card = div() {
+  style() { "p { margin: 0; }" }
+  script() { "init()" }
+  par() { "card" }
+}
+box() { card }   # expect: <!DOCTYPE html><html lang="html"><head><style>p { margin: 0; }</style></head><body><div><p>card</p></div><script>init()</script></body></html>

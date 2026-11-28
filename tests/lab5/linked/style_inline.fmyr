@@ -1,0 +1,2 @@
+# inline CSS is collected into <head>, wherever it is written
+div() { style() { "p { color: red; }" } par() { "Hi" } }   # expect: <!DOCTYPE html><html lang="html"><head><style>p { color: red; }</style></head><body><div><p>Hi</p></div></body></html>

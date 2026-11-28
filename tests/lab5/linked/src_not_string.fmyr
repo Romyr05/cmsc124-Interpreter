@@ -1,0 +1,1 @@
+style(src = 5) { }   # expect runtime error: src must be a string.

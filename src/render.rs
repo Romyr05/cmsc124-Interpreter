@@ -60,13 +60,13 @@ pub fn render_element(
 
     let document = evaluate_options(options, env)?;
     let value = env.evaluate(component)?;
-    if !value.is_markup() {
+    let Some(markup) = value.as_markup() else {
         return Err(RuntimeError::new(
             line,
             "render() expects an element or a component value.",
         ));
-    }
-    let html = wrap_document(&stringify(&value), &document);
+    };
+    let html = wrap_document(&markup, &document);
     write_document(&html, &source, line)?;
     Ok(())
 }

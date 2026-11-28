@@ -44,8 +44,8 @@ impl Environment {
                     let script = crate::code_generator::generate_script_body(element, self)?;
                     Ok(Value::Script(script))
                 } else {
-                    let html = crate::code_generator::generate_fragment(element, self)?;
-                    Ok(Value::Component(html))
+                    let markup = crate::code_generator::generate_fragment(element, self)?;
+                    Ok(Value::Component(markup))
                 }
             }
         }
@@ -199,7 +199,7 @@ pub fn stringify(value: &Value) -> String {
         Value::Str(s) => s.clone(),
         Value::Bool(b) => b.to_string(),
         Value::Nil => "null".to_string(),
-        Value::Component(html) => html.clone(),
-        Value::Script(js) => format!("<script>{}</script>", js),
+        Value::Component(markup) => markup.to_html(),
+        Value::Script(js) => crate::ast::script_tag(js),
     }
 }

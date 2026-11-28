@@ -1,0 +1,1 @@
+div(src = "assets/page.css") { }   # expect error: src is only allowed on script and style, not div.

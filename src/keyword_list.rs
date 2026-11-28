@@ -7,6 +7,7 @@ pub fn keywords_lookup(word: &str) -> TokenType {
         "print" => TokenType::Print,
         "render" => TokenType::Render,
         "script" => TokenType::Script,
+        "style" => TokenType::Style,
         "if" => TokenType::If,
         "else" => TokenType::Else,
         "while" => TokenType::While,
@@ -36,6 +37,8 @@ pub fn keywords_lookup(word: &str) -> TokenType {
         "border" => TokenType::StyleBorder,
         // events
         "on_click" => TokenType::OnClick,
+        // linked files
+        "src" => TokenType::Src,
         _ => TokenType::Identifier,
     }
 }
@@ -50,6 +53,7 @@ pub fn is_element_keyword(token_type: TokenType) -> bool {
             | TokenType::Div
             | TokenType::Paragraph
             | TokenType::Script
+            | TokenType::Style
     )
 }
 
@@ -69,6 +73,7 @@ pub fn is_attribute_keyword(token_type: TokenType) -> bool {
             | TokenType::StyleWidth
             | TokenType::StyleColor
             | TokenType::StyleBorder
+            | TokenType::Src
     ) || is_event_attribute(token_type)
 }
 
@@ -81,6 +86,7 @@ pub fn element_name(token_type: TokenType) -> &'static str {
         TokenType::Div => "div",
         TokenType::Paragraph => "par",
         TokenType::Script => "script",
+        TokenType::Style => "style",
         _ => "?element",
     }
 }
@@ -97,6 +103,7 @@ pub fn attribute_name(token_type: TokenType) -> &'static str {
         TokenType::StyleColor => "color",
         TokenType::StyleBorder => "border",
         TokenType::OnClick => "on_click",
+        TokenType::Src => "src",
         _ => "?attr",
     }
 }

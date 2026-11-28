@@ -9,6 +9,7 @@ use crate::token_types::{Token, TokenType};
 // elements, but the message names the body that was actually used.
 const CONTROL_BODY_ELEMENTS_ERROR: &str = "Elements are not allowed inside an if or while body";
 const SCRIPT_BODY_ELEMENTS_ERROR: &str = "Elements are not allowed inside a script body";
+const STYLE_BODY_ELEMENTS_ERROR: &str = "Elements are not allowed inside a style body";
 
 // Recursive Descent Parser
 //
@@ -371,7 +372,7 @@ impl<'a> Parser<'a> {
         if !is_element_keyword(kind.token_type) {
             return Err(ParseError {
                 token: kind,
-                message: "Expected an element keyword (button, box, text, image, div, par, script)"
+                message: "Expected an element keyword (button, box, text, image, div, par, script, style)"
                     .to_string(),
             });
         }
@@ -382,11 +383,11 @@ impl<'a> Parser<'a> {
         let attributes = self.attribute_list()?;
         self.expect(TokenType::RightParen, "Expected ')' after attributes")?;
 
-        // box and image emit only their contents, and script has no HTML tag of
-        // its own for an event handler to attach to.
+        // box and image emit only their contents, and script/style have no
+        // visible tag of their own for an event handler to attach to.
         if matches!(
             kind.token_type,
-            TokenType::Box | TokenType::Image | TokenType::Script
+            TokenType::Box | TokenType::Image | TokenType::Script | TokenType::Style
         ) && let Some(attribute) = attributes
             .iter()
             .find(|attribute| is_event_attribute(attribute.kind))
@@ -401,14 +402,49 @@ impl<'a> Parser<'a> {
             });
         }
 
-        // A script body is JavaScript source, not HTML: statements and string
-        // expressions are allowed, but nested elements are a parse error.
-        let (allow_elements, body_name, elements_error) = if kind.token_type == TokenType::Script {
-            (false, "script", SCRIPT_BODY_ELEMENTS_ERROR)
-        } else {
-            (true, "element", CONTROL_BODY_ELEMENTS_ERROR)
+        // src links a file whose text replaces the body, so it only makes sense
+        // on the two raw-text elements.
+        let src = attributes
+            .iter()
+            .find(|attribute| attribute.kind == TokenType::Src);
+        if src.is_some() && !matches!(kind.token_type, TokenType::Script | TokenType::Style) {
+            return Err(ParseError {
+                token: kind,
+                message: format!(
+                    "src is only allowed on script and style, not {}.",
+                    element_name(kind.token_type)
+                ),
+            });
+        }
+        let has_src = src.is_some();
+
+        // Script and style bodies are raw JavaScript/CSS source, not HTML:
+        // statements and string expressions are allowed, but nested elements
+        // are a parse error.
+        let (allow_elements, body_name, elements_error) = match kind.token_type {
+            TokenType::Script => (false, "script", SCRIPT_BODY_ELEMENTS_ERROR),
+            TokenType::Style => (false, "style", STYLE_BODY_ELEMENTS_ERROR),
+            _ => (true, "element", CONTROL_BODY_ELEMENTS_ERROR),
         };
-        let children = self.body(allow_elements, body_name, elements_error)?;
+        // A linking element needs no body: `script(src = "app.js")` is complete
+        // without `{ }`. Without src the body is the content, so it is required.
+        let children = if has_src && !self.is_type(TokenType::LeftBrace) {
+            Vec::new()
+        } else {
+            self.body(allow_elements, body_name, elements_error)?
+        };
+
+        // With src the file supplies the content, so a body would compete with
+        // it. Rejecting the combination avoids deciding which one wins.
+        if has_src && !children.is_empty() {
+            return Err(ParseError {
+                token: kind,
+                message: format!(
+                    "{} with src must have an empty body.",
+                    element_name(kind.token_type)
+                ),
+            });
+        }
 
         Ok(Element {
             kind: kind.token_type,
@@ -542,14 +578,14 @@ impl<'a> Parser<'a> {
         Ok(attributes)
     }
 
-    // Event attributes may appear at most once per element. Other attributes
-    // keep their existing behavior (for example, duplicate color declarations
-    // simply contribute two CSS declarations).
+    // Event attributes and src may appear at most once per element. Other
+    // attributes keep their existing behavior (for example, duplicate color
+    // declarations simply contribute two CSS declarations).
     fn push_attribute(
         attributes: &mut Vec<Attribute<'a>>,
         attribute: Attribute<'a>,
     ) -> Result<(), ParseError<'a>> {
-        if is_event_attribute(attribute.kind)
+        if (is_event_attribute(attribute.kind) || attribute.kind == TokenType::Src)
             && attributes
                 .iter()
                 .any(|existing| existing.kind == attribute.kind)
@@ -573,7 +609,7 @@ impl<'a> Parser<'a> {
             return Err(ParseError {
                 token: kind,
                 message: "Expected an attribute name (id, class, align, padding, margin, \
-                          height, width, color, border, on_click)"
+                          height, width, color, border, on_click, src)"
                     .to_string(),
             });
         }

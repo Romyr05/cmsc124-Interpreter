@@ -1,0 +1,2 @@
+# a linked JS file is read and inlined at the end of <body>
+div() { script(src = "assets/app.js") { } par() { "Hi" } }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><div><p>Hi</p></div><script>console.log('linked')</script></body></html>

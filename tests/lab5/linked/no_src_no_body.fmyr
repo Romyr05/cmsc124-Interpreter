@@ -1,0 +1,2 @@
+# without src the body is the content, so { } is still required
+style()   # expect error: Expected '{' to start style body
