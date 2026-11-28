@@ -1,0 +1,1 @@
+script(on_click = "x") { "console.log('hi')" }   # expect error: on_click is not supported on script yet.

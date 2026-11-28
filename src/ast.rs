@@ -37,7 +37,6 @@ pub struct Attribute<'a> {
     pub kind: TokenType,
     pub value: Expr<'a>,
     // line of the attribute name, used for diagnostics that point at the attribute
-    #[allow(dead_code)] // reserved for event-handler type errors
     pub line: usize,
 }
 

@@ -1,0 +1,1 @@
+div(on_click = "alert('hi')", color = "red") { "Click" }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><div style="color:red;" onclick="alert('hi')">Click</div></body></html>

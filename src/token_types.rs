@@ -52,6 +52,7 @@ pub enum TokenType {
     StyleWidth,
     StyleColor,
     StyleBorder,
+    OnClick,
     Newline,
     Eof,
 }

@@ -1,0 +1,1 @@
+(button (on_click alert('hi')) Go)

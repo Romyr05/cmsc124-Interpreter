@@ -87,14 +87,16 @@ element keywords yet.
 
 #### Attributes
 
-These names are reserved attribute keywords. Only `color` currently changes the
-rendered tags; it sets CSS text color. Other attributes are parsed but ignored by
-the HTML generator.
+These names are reserved attribute keywords. Only `color` and `on_click` currently
+change the rendered tags; `color` sets CSS text color and `on_click` attaches an
+inline JavaScript click handler. Other attributes are parsed but ignored by the
+HTML generator.
 | Keyword | function |
 |---|---|
 | `id` | id attribute, uniquely identifies a component
 | `class` | class attribute, identifies common components
 | `color` | CSS text color, computed from an expression in the enclosing scope
+| `on_click` | inline JavaScript click handler, from a string or script component
 | `align` | align style attribute, can be set to start, center, end
 | `padding` | padding style attribute, can be set to integer values
 | `margin` | margin style attribute, can be set to integer values
@@ -103,21 +105,21 @@ the HTML generator.
 | `border` | border style attribute, can be set to integer values
 
 
-## Events (planned)
+## Events
 
-Event handlers, functions, and `return` are not implemented or reserved keywords.
-The following catalog describes intended features.
- 
+`on_click` is implemented as an attribute that emits an inline `onclick` handler.
+The remaining event handlers, functions, and `return` are still planned features.
+
 | Keyword | Function |
 |---|---|
-| `on_click` | runs a function when clicked |
-| `on_hover` | runs a function on mouse hover |
-| `on_change` | runs a function when value changes |
-| `on_submit` | runs a function on form submission |
-| `on_focus` | runs a function when component gains focus |
-| `on_blur` | runs a function when component loses focus |
-| `function` | defines a function, followed by {} and runs the code inside |
-| `return` | returns a value of the returned type from the function |
+| `on_click` | runs JavaScript when the element is clicked |
+| `on_hover` | runs a function on mouse hover (planned) |
+| `on_change` | runs a function when value changes (planned) |
+| `on_submit` | runs a function on form submission (planned) |
+| `on_focus` | runs a function when component gains focus (planned) |
+| `on_blur` | runs a function when component loses focus (planned) |
+| `function` | defines a function (planned) |
+| `return` | returns a value from a function (planned) |
 
 ### Operators
 
@@ -209,7 +211,7 @@ ELEMENT     -> "button" | "box" | "text" | "image" | "div" | "par" | "script"
 attributes  -> attribute ( "," attribute )*
 attribute   -> ATTRIBUTE "=" expression
 ATTRIBUTE   -> "id" | "class" | "align" | "padding" | "margin"
-             | "height" | "width" | "color" | "border"
+             | "height" | "width" | "color" | "border" | "on_click"
 body        -> ( child | NEWLINE )*
 child       -> element | ifStmt | whileStmt | letDecl | printStmt
              | assignment | exprStmt
@@ -431,6 +433,56 @@ pass it to `render`.
   are allowed. Use single quotes for JavaScript string literals. A literal
   `</script>` in the JavaScript closes the HTML tag early; it is not escaped.
 
+### on_click
+
+- Syntax: `button(on_click = expression) { ... }`. It is also allowed on `div`,
+  `text`, and `par`. `box`, `image`, and `script` currently reject it because
+  they do not emit an element tag for the handler to attach to.
+- The expression is evaluated in the enclosing scope before the element body
+  runs, like `color`. It must produce either:
+  - a string, used directly as JavaScript source, or
+  - a script component, whose raw JavaScript body is used as the handler.
+- A script component used as `on_click` is not also emitted as `<script>`.
+  To include the script tag, use the component as an element child as well.
+- The handler is emitted as a double-quoted `onclick` attribute. HTML-special
+  characters are escaped in the generated source; the browser decodes the
+  attribute before compiling it. Single quotes are left alone inside the
+  double-quoted attribute, so handlers remain readable.
+- A duplicate `on_click` on one element is a parse error.
+- Direct handler:
+
+  ```
+  button(on_click = "alert('Hello!')") { "Say hello" }
+  ```
+
+- Script component handler:
+
+  ```
+  let hello = script() { "alert('Hello!')" }
+  button(on_click = hello) { "Say hello" }
+  ```
+
+- Shared function defined in a script, called by the handler:
+
+  ```
+  let helpers = script() { "function greet() { alert('Hello!') }" }
+
+  render(div() {
+    button(on_click = "greet()") { "Say hello" }
+    helpers
+  })
+  ```
+
+  Here `helpers` is emitted as a `<script>` and the button calls `greet()`.
+  Passing `helpers` directly as `on_click` would use the function declaration
+  itself as the click handler, which does nothing useful.
+- Handlers run later in the browser's global scope; `this` is the element and
+  `event` is available. Framyr variables are evaluated at build time, so their
+  values are baked into the generated JavaScript. Use JavaScript variables for
+  state that changes while the page is open.
+- Functions and closures are still not implemented. Inline handlers may be
+  blocked by a strict Content Security Policy (see Known limitations).
+
 ### Truthiness
 
 Only `false` and `null` are falsey. Numbers (including `0`) and strings
@@ -573,7 +625,7 @@ tracked in issue #74.
 | tests/lab2 | Parser | sidecar | `--parse` |
 | tests/lab3 | Evaluator | inline | `--eval` |
 | tests/lab4 | Context | inline | none |
-| tests/lab5 | Control flow, render options, script elements, and component values | inline | none |
+| tests/lab5 | Control flow, render options, script elements, components, and on_click | inline | none |
 
 
 Parser recovery cases run through the same annotated file harness in
@@ -630,33 +682,36 @@ blue
 The div's text is blue and the button's label is red. `color` sets the CSS text
 color, rather than the background. The div header reads the global `shade` before
 entering its body. The inner declaration supplies red to the button header; after
-the body ends, `print(shade)` still reads blue. The button is a static HTML control;
-JavaScript behavior can be added with a nested `script` element.
+the body ends, `print(shade)` still reads blue. The button is a static HTML control
+unless it has an `on_click` handler; JavaScript behavior can also be added with a
+nested `script` element.
 
 `div`, `text`, `par`, and `button` generate HTML tags (`div`, `h1`, `p`, and
 `button`). Their `color` expressions are evaluated in the enclosing scope before
 the body runs, converted using the normal value-printing rules, and escaped for an
 HTML style attribute. Text content is also escaped. CSS interprets the resulting
-color value. Other attributes currently parse but do not affect generated HTML;
-`box` and `image` currently emit only their contents.
+color value. `on_click` expressions are also evaluated before the body and emit
+an inline handler. Other attributes currently parse but do not affect generated
+HTML; `box` and `image` currently emit only their contents.
 
-Run [examples/interactive.fmyr](examples/interactive.fmyr) to see document options
-and JavaScript together:
+Run [examples/interactive.fmyr](examples/interactive.fmyr) to see document
+options, component values, and `on_click` together:
 
 ```text
 let heading = "Interactive Demo"
 
+let hello = script() {
+  "alert('Hello!')"
+}
+
 render(div() {
   text() { heading }
-  button() { "Say hello" }
-  script() {
-    "document.querySelector('button').addEventListener('click', () => alert('Hello!'))"
-  }
+  button(on_click = hello) { "Say hello" }
 }, title = heading, lang = "en")
 ```
 
 This writes `examples/interactive.html` with `<html lang="en">`, a `<title>`,
-and an inline click handler for the button.
+and a button carrying `onclick="alert('Hello!')"`.
 
 Run [examples/components.fmyr](examples/components.fmyr) to see components bound
 to variables and reused:
@@ -698,9 +753,13 @@ would each need a larger evaluation model, so they remain future work.
 - REPL submissions must be complete on one line (#74).
 - Parser diagnostics currently lack line numbers (#75).
 - String escapes are not decoded; literal newlines in strings are supported (#59).
-- Only `color` affects element styling; the other parsed attributes are ignored.
+- Only `color` affects element styling; `on_click` emits a behavior attribute;
+  the other parsed attributes are ignored.
 - `box` and `image` currently emit only their contents. Additional components,
-  functions, closures, and events remain planned features.
+  functions, closures, and the remaining events remain planned features.
+- `on_click` only accepts a JavaScript string or a script component. There are no
+  Framyr function handlers yet, and `box`, `image`, and `script` reject the
+  attribute. Inline handlers may be blocked by a strict Content Security Policy.
 - Component values are eager HTML snapshots, not lazy templates. Reusing one does
   not re-run its body or update it after outer bindings change. There are no
   component props or closures yet.
@@ -715,7 +774,8 @@ would each need a larger evaluation model, so they remain future work.
   bodies; element expressions may be used there as values. Component values used
   as script expressions are a runtime error.
 - `script` content is emitted raw; external scripts (`src`) and `</script>`
-  escaping are not implemented. Its attributes are parsed but ignored.
+  escaping are not implemented. Its non-event attributes are parsed but ignored;
+  event attributes on `script` are rejected.
 - Extremely deep expressions can overflow the host stack (#53).
 
 ## Changelog
@@ -729,3 +789,4 @@ would each need a larger evaluation model, so they remain future work.
 | Lab 4 | Mutable bindings, lexical body scopes, explicit printing, file execution, and scoped button colors. |
 | Lab 5 | `render(element, title = ..., lang = ...)` customizes the document wrapper and ends interpretation; `script() {}` embeds raw JavaScript. |
 | Components | Element literals are expressions; `let`/assignment can bind any component; component values are inserted raw as children; `render` accepts an element or component variable; script components retain raw JavaScript. |
+| Events | `on_click = <string or script component>` emits an inline `onclick` handler on `button`, `div`, `text`, and `par`. |

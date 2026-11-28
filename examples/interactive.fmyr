@@ -1,9 +1,10 @@
 let heading = "Interactive Demo"
 
+let hello = script() {
+  "alert('Hello!')"
+}
+
 render(div() {
   text() { heading }
-  button() { "Say hello" }
-  script() {
-    "document.querySelector('button').addEventListener('click', () => alert('Hello!'))"
-  }
+  button(on_click = hello) { "Say hello" }
 }, title = heading, lang = "en")

@@ -1,0 +1,2 @@
+let name = "World"
+button(on_click = "alert('Hello, " + name + "!')") { "Go" }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><button onclick="alert('Hello, World!')">Go</button></body></html>

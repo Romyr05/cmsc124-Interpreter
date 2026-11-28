@@ -1,7 +1,8 @@
-use crate::ast::Element;
+use crate::ast::{Element, Value};
 use crate::environment::Environment;
 use crate::errors::RuntimeError;
 use crate::evaluator::stringify;
+use crate::keyword_list::{attribute_name, event_html_name, is_event_attribute};
 use crate::parser::TopLevel;
 use crate::token_types::TokenType;
 
@@ -134,19 +135,49 @@ fn append_element(
     body.push('<');
     body.push_str(tag);
     let mut style = String::new();
+    let mut events: Vec<(&'static str, String)> = Vec::new();
     // Headers read the enclosing scope. A declaration in this element's body
     // can affect a child's header, but cannot change this header retroactively.
     for attribute in &element.attributes {
-        if attribute.kind == TokenType::StyleColor {
-            let value = stringify(&env.evaluate(&attribute.value)?);
-            style.push_str("color:");
-            style.push_str(&value);
-            style.push(';');
+        match attribute.kind {
+            TokenType::StyleColor => {
+                let value = stringify(&env.evaluate(&attribute.value)?);
+                style.push_str("color:");
+                style.push_str(&value);
+                style.push(';');
+            }
+            kind if is_event_attribute(kind) => {
+                let javascript = match env.evaluate(&attribute.value)? {
+                    // A plain string is already JavaScript source.
+                    Value::Str(javascript) => javascript,
+                    // A script component contributes only its raw body; its
+                    // <script> wrapper would be wrong inside an attribute.
+                    Value::Script(javascript) => javascript,
+                    _ => {
+                        return Err(RuntimeError::new(
+                            attribute.line,
+                            format!(
+                                "{} handler must be a string or a script component.",
+                                attribute_name(kind)
+                            ),
+                        ));
+                    }
+                };
+                events.push((event_html_name(kind), javascript));
+            }
+            _ => {}
         }
     }
     if !style.is_empty() {
         body.push_str(" style=\"");
         body.push_str(&escape_html(&style));
+        body.push('"');
+    }
+    for (name, javascript) in events {
+        body.push(' ');
+        body.push_str(name);
+        body.push_str("=\"");
+        body.push_str(&escape_attribute(&javascript));
         body.push('"');
     }
     body.push('>');
@@ -163,6 +194,16 @@ fn escape_html(text: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
         .replace('\'', "&#39;")
+}
+
+// Escape a value for a double-quoted HTML attribute. Single quotes stay as-is:
+// they are safe inside double quotes and keeping them makes JavaScript handlers
+// readable. The browser decodes this once before compiling the handler.
+fn escape_attribute(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 // Render only the element's own HTML, without the document wrapper. Component

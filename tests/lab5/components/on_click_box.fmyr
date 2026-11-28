@@ -1,0 +1,1 @@
+box(on_click = "x") { "content" }   # expect error: on_click is not supported on box yet.

@@ -1,6 +1,8 @@
 use crate::ast::{Attribute, Element, Expr, RenderOption, RenderOptionKind, Value};
 use crate::errors::ParseError;
-use crate::keyword_list::{is_attribute_keyword, is_element_keyword};
+use crate::keyword_list::{
+    attribute_name, element_name, is_attribute_keyword, is_element_keyword, is_event_attribute,
+};
 use crate::token_types::{Token, TokenType};
 
 // Body diagnostics: control-flow bodies and script bodies both reject nested
@@ -380,6 +382,25 @@ impl<'a> Parser<'a> {
         let attributes = self.attribute_list()?;
         self.expect(TokenType::RightParen, "Expected ')' after attributes")?;
 
+        // box and image emit only their contents, and script has no HTML tag of
+        // its own for an event handler to attach to.
+        if matches!(
+            kind.token_type,
+            TokenType::Box | TokenType::Image | TokenType::Script
+        ) && let Some(attribute) = attributes
+            .iter()
+            .find(|attribute| is_event_attribute(attribute.kind))
+        {
+            return Err(ParseError {
+                token: kind,
+                message: format!(
+                    "{} is not supported on {} yet.",
+                    attribute_name(attribute.kind),
+                    element_name(kind.token_type)
+                ),
+            });
+        }
+
         // A script body is JavaScript source, not HTML: statements and string
         // expressions are allowed, but nested elements are a parse error.
         let (allow_elements, body_name, elements_error) = if kind.token_type == TokenType::Script {
@@ -513,12 +534,37 @@ impl<'a> Parser<'a> {
             return Ok(attributes);
         }
 
-        attributes.push(self.attribute()?);
+        Self::push_attribute(&mut attributes, self.attribute()?)?;
         while self.consume_on_type(&[TokenType::Comma]) {
-            attributes.push(self.attribute()?);
+            Self::push_attribute(&mut attributes, self.attribute()?)?;
         }
 
         Ok(attributes)
+    }
+
+    // Event attributes may appear at most once per element. Other attributes
+    // keep their existing behavior (for example, duplicate color declarations
+    // simply contribute two CSS declarations).
+    fn push_attribute(
+        attributes: &mut Vec<Attribute<'a>>,
+        attribute: Attribute<'a>,
+    ) -> Result<(), ParseError<'a>> {
+        if is_event_attribute(attribute.kind)
+            && attributes
+                .iter()
+                .any(|existing| existing.kind == attribute.kind)
+        {
+            return Err(ParseError {
+                token: Token::new(
+                    attribute.kind,
+                    attribute_name(attribute.kind),
+                    attribute.line,
+                ),
+                message: format!("Duplicate attribute '{}'.", attribute_name(attribute.kind)),
+            });
+        }
+        attributes.push(attribute);
+        Ok(())
     }
 
     fn attribute(&mut self) -> Result<Attribute<'a>, ParseError<'a>> {
@@ -527,7 +573,7 @@ impl<'a> Parser<'a> {
             return Err(ParseError {
                 token: kind,
                 message: "Expected an attribute name (id, class, align, padding, margin, \
-                          height, width, color, border)"
+                          height, width, color, border, on_click)"
                     .to_string(),
             });
         }

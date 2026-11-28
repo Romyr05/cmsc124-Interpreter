@@ -1,0 +1,1 @@
+button(on_click = "a", on_click = "b") { "Go" }   # expect error: Duplicate attribute 'on_click'.
