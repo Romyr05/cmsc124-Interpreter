@@ -209,6 +209,7 @@ assignment  -> IDENTIFIER "=" expression
 exprStmt    -> expression
 
 element     -> ELEMENT "(" attributes? ")" "{" body "}"
+             | ( "script" | "style" ) "(" attributes ")"   # only when attributes include src
 ELEMENT     -> "button" | "box" | "text" | "image" | "div" | "par" | "script"
              | "style"
 attributes  -> attribute ( "," attribute )*
@@ -464,9 +465,13 @@ pass it to `render`.
 
 ### src
 
-- Syntax: `script(src = expression) { }` or `style(src = expression) { }`. The
-  body must be empty; content in it is a parse error (exit 65):
-  `script with src must have an empty body.`
+- Syntax: `script(src = expression)` or `style(src = expression)`. With `src`
+  the `{ }` may be left out, since the element only links a file; an empty
+  `{ }` is also accepted. Without `src`, the body is the content and `{ }` is
+  required (`Expected '{' to start style body`, exit 65).
+- Content rule: `src` and no body reads the file; no `src` uses the body; `src`
+  together with a non-empty body is a parse error (exit 65), to avoid deciding
+  which one wins: `script with src must have an empty body.`
 - The expression must evaluate to a string path; anything else is a runtime error
   (exit 70): `src must be a string.`
 - The path is relative to the running `.fmyr` file's folder, which is also where
@@ -484,7 +489,7 @@ pass it to `render`.
   `src is only allowed on script and style, not div.` A second `src` on the same
   element is a parse error: `Duplicate attribute 'src'.`
 - A script component with `src` stores the file's JavaScript, so it can also be
-  an `on_click` handler: `let h = script(src = "handler.js") { }`.
+  an `on_click` handler: `let h = script(src = "handler.js")`.
 - Example: `tests/lab5/render/linked_assets.fmyr` writes
 
   ```html

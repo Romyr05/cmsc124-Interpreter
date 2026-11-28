@@ -426,7 +426,13 @@ impl<'a> Parser<'a> {
             TokenType::Style => (false, "style", STYLE_BODY_ELEMENTS_ERROR),
             _ => (true, "element", CONTROL_BODY_ELEMENTS_ERROR),
         };
-        let children = self.body(allow_elements, body_name, elements_error)?;
+        // A linking element needs no body: `script(src = "app.js")` is complete
+        // without `{ }`. Without src the body is the content, so it is required.
+        let children = if has_src && !self.is_type(TokenType::LeftBrace) {
+            Vec::new()
+        } else {
+            self.body(allow_elements, body_name, elements_error)?
+        };
 
         // With src the file supplies the content, so a body would compete with
         // it. Rejecting the combination avoids deciding which one wins.
