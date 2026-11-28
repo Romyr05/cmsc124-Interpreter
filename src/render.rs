@@ -1,8 +1,8 @@
-// Render pipeline: turn render(element, title = ..., lang = ...) into a sibling
-// .html file. HTML construction lives in code_generator; this module owns the
-// file target, filesystem errors, and the success message.
-use crate::ast::{Element, RenderOption, RenderOptionKind};
-use crate::code_generator::{DocumentOptions, generate_document};
+// Render pipeline: turn render(component, title = ..., lang = ...) into a
+// sibling .html file. HTML construction lives in code_generator; this module
+// owns the file target, filesystem errors, and the success message.
+use crate::ast::{Expr, RenderOption, RenderOptionKind};
+use crate::code_generator::{DocumentOptions, wrap_document};
 use crate::environment::Environment;
 use crate::errors::RuntimeError;
 use crate::evaluator::stringify;
@@ -29,7 +29,7 @@ fn write_document(html: &str, source: &Path, line: usize) -> Result<PathBuf, Run
 // Options are parsed at most once each, so plain assignment is unambiguous.
 fn evaluate_options(
     options: &[RenderOption<'_>],
-    env: &Environment,
+    env: &mut Environment,
 ) -> Result<DocumentOptions, RuntimeError> {
     let mut document = DocumentOptions::default();
     for option in options {
@@ -42,11 +42,13 @@ fn evaluate_options(
     Ok(document)
 }
 
-// Generate the element with the current environment and write the document next
-// to the source file. The source path is checked before options or the element
-// body run, so a REPL render fails without evaluating anything.
+// Evaluate the root component with the current environment and write the
+// document next to the source file. The source path is checked before options
+// or the component body run, so a REPL render fails without evaluating
+// anything. Options still run before the root expression, preserving the old
+// rule that title/lang cannot read bindings from the rendered element body.
 pub fn render_element(
-    element: &Element<'_>,
+    component: &Expr<'_>,
     options: &[RenderOption<'_>],
     env: &mut Environment,
     line: usize,
@@ -57,7 +59,14 @@ pub fn render_element(
         .ok_or_else(|| RuntimeError::new(line, "render() requires running a .fmyr file."))?;
 
     let document = evaluate_options(options, env)?;
-    let html = generate_document(element, env, &document)?;
+    let value = env.evaluate(component)?;
+    if !value.is_markup() {
+        return Err(RuntimeError::new(
+            line,
+            "render() expects an element or a component value.",
+        ));
+    }
+    let html = wrap_document(&stringify(&value), &document);
     write_document(&html, &source, line)?;
     Ok(())
 }

@@ -106,11 +106,11 @@ impl Environment {
             // render builds one document, writes it beside the source file, and
             // ends interpretation by returning Flow::Stop.
             TopLevel::Render {
-                element,
+                component,
                 options,
                 line,
             } => {
-                render::render_element(element, options, self, *line)?;
+                render::render_element(component, options, self, *line)?;
                 return Ok(Flow::Stop);
             }
             // a declaration prints nothing; on error the table is left as it was

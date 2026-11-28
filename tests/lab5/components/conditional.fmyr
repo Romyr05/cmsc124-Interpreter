@@ -1,0 +1,7 @@
+let label
+if (false) {
+  label = text() { "Pass" }
+} else {
+  label = text() { "Fail" }
+}
+div() { label }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><div><h1>Fail</h1></div></body></html>

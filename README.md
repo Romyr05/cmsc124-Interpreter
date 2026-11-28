@@ -9,8 +9,9 @@
 
 Framyr is an imperative DSL for constructing HTML from GUI components. Programs
 execute statements in order, create mutable named bindings with `let`, and update
-them with assignment. Expressions compute values; statements control effects such
-as printing, changing a binding, or generating an element.
+them with assignment. Expressions compute values, including reusable component
+values; statements control effects such as printing, changing a binding, or
+emitting an element.
 
 ## Host language and build
 
@@ -198,7 +199,7 @@ blockStmt   -> ifStmt | whileStmt | letDecl | printStmt | assignment | exprStmt
 
 letDecl     -> "let" IDENTIFIER ( "=" expression )?
 printStmt   -> "print" "(" expression ")"
-renderStmt  -> "render" "(" element ( "," renderOption )* ")"
+renderStmt  -> "render" "(" expression ( "," renderOption )* ")"
 renderOption -> ("title" | "lang") "=" expression
 assignment  -> IDENTIFIER "=" expression
 exprStmt    -> expression
@@ -223,7 +224,7 @@ factor      -> unary ( ( "*" | "/" ) unary )*
 unary       -> "-" unary | exponent
 exponent    -> primary ( "^" unary )?
 primary     -> NUMBER | FLOAT | STRING | "true" | "false" | "null"
-             | IDENTIFIER | "(" expression ")"
+             | IDENTIFIER | element | "(" expression ")"
 ```
 
 Precedence, lowest to highest: `or`, `and`, `not`, comparisons, `+ -`, `* /`, unary `-`, `^`. All binary operators are left-associative except `^`, which is right-associative (`2^3^2` is `2^(3^2)`). Unary `-` binds looser than `^`, so `-2^2` is `-(2^2)`.
@@ -261,7 +262,14 @@ Runtime values are held in a Rust `enum` (a tagged union), `Value` in
 `src/ast.rs`:
 
 ```rust
-enum Value { Number(f64), Str(String), Bool(bool), Nil }
+enum Value {
+    Number(f64),
+    Str(String),
+    Bool(bool),
+    Nil,
+    Component(String), // generated HTML fragment
+    Script(String),    // raw JavaScript body
+}
 ```
 
 We chose a tagged union over a `Box<dyn Any>` + downcast approach because it is
@@ -273,12 +281,77 @@ Numbers are all `f64` (one numeric type, dynamically typed), so arithmetic uses
 floating-point precision even when a source literal looks like an integer.
 Operands are evaluated left to right, except when `and` or `or` short-circuits.
 
+`Component` and `Script` are the two component value kinds. A `Component` holds
+an already-generated HTML fragment. A `Script` holds a script element's raw
+JavaScript body; it renders as `<script>...</script>` when used as a child. Both
+are markup values and are inserted raw when they appear in an element body,
+unlike strings, which are HTML-escaped.
+
 ### Value printing
 
 - Numbers: trimmed, so `5.0` prints as `5` (Rust's `f64` Display does this).
 - Null: `null` (represented internally by `Value::Nil`).
 - Booleans: `true` or `false`.
 - Strings: without quotes, so `"hi"` prints `hi`.
+- Components: the stored HTML fragment, without an added document wrapper.
+- Script components: `<script>` followed by the raw JavaScript and `</script>`.
+
+### Components as values
+
+Element literals are expressions. Any component can be bound to a variable and
+reused:
+
+```
+let card = div() {
+  text() { "Hello" }
+  button() { "Open" }
+}
+
+div() {
+  card
+  card
+}
+```
+
+- `let card = div() { ... }` evaluates the element immediately and stores its
+  HTML fragment as a component value.
+- Using `card` as a child of another element inserts that HTML raw, so the tags
+  are preserved. Reusing it inserts the same fragment each time.
+- The component body runs once, when the binding is evaluated. Its declarations
+  belong to the element body's own scope, and any `print` runs at that time.
+- Component values are snapshots. Changing a variable used inside the component
+  after the binding does not update the stored HTML.
+- `let` and assignment share the same rule, so a component can be replaced
+  later with `card = text() { "New" }`.
+- Element expressions can be used inside `if`/`while` statement bodies even
+  though direct element statements there are still rejected. This allows
+  conditional component construction:
+
+  ```
+  let label
+  if (score > 50) {
+    label = text() { "Pass" }
+  } else {
+    label = text() { "Fail" }
+  }
+  div() { label }
+  ```
+
+- A script component keeps its raw JavaScript. Used as a child it emits a
+  `<script>` element:
+
+  ```
+  let helper = script() { "console.log('hi')" }
+  div() { helper }
+  ```
+
+  The raw body is also what event handlers will use once `on_click` is
+  implemented.
+
+A bare component expression at top level follows the normal expression rule: in
+plain file execution its value is computed and discarded, while `--eval` and the
+REPL print it. To put a component on a page, use it inside an element body or
+pass it to `render`.
 
 ### print
 
@@ -299,19 +372,26 @@ Operands are evaluated left to right, except when `and` or `or` short-circuits.
 
 ### render
 
-- Syntax: `render(element, option = expression, ...)` on its own line, for example
+- Syntax: `render(component, option = expression, ...)` on its own line, for example
   `render(box() { text() { "Hello" } }, title = "Greeting", lang = "en")`.
-- The first argument must be an element literal. `render()` and `render(expression)` are parse errors.
+- The first argument is an expression that must evaluate to a component value. It can
+  be an element literal or a variable holding a component:
+  - `render(div() { text() { "Hello" } })`
+  - `let card = div() { text() { "Hello" } }` then `render(card, title = "Card")`
+  - A script component renders as `<script>...</script>` in the document body.
+  - `render()` is a parse error. A non-component value such as `render(5)` is a
+    runtime error (exit 70): `render() expects an element or a component value.`
 - Optional named parameters customize the document boilerplate:
   - `title`: evaluated in the enclosing scope, converted with the normal value-printing
     rules, HTML-escaped, and written as `<title>...</title>` inside `<head>`.
   - `lang`: evaluated in the enclosing scope, converted with the normal value-printing
     rules, HTML-escaped, and used for `<html lang="...">`. The default remains `"html"`.
-  - Parameters may appear in any order after the element. Unknown, duplicate, or
+  - Parameters may appear in any order after the component. Unknown, duplicate, or
     malformed parameters are parse errors (exit 65). With no parameters, the document
     wrapper is unchanged: `<head></head>` and `<html lang="html">`.
-  - Parameter expressions run before the element body, so they cannot read bindings
-    declared inside that body.
+  - Parameter expressions run before the component expression, so they cannot read
+    bindings declared inside an inline element body. A component variable was
+    already evaluated when its binding ran, so its snapshot is unaffected.
 - `render` is allowed only at top level. It is a parse error inside an element or control-flow body.
 - A source file may contain at most one render; a second one is a parse error (exit 65).
 - Output path: the source file with its extension replaced by `.html`. `examples/demo.fmyr` writes `examples/demo.html`; an existing file is overwritten.
@@ -319,7 +399,7 @@ Operands are evaluated left to right, except when `and` or `or` short-circuits.
 - Top-level elements before render still print their own documents to stdout.
 - `render` prints `Rendered <path>` to stderr on success. It produces no stdout output.
 - In the REPL there is no source file, so render reports `render() requires running a .fmyr file.` and the session continues.
-- `--parse` shows it as `(render <element> (title <expr>) (lang <expr>))`, including
+- `--parse` shows it as `(render <component> (title <expr>) (lang <expr>))`, including
   only the options present in the source; `--tokenize` and `--parse` never write files.
 
 ### script
@@ -333,9 +413,15 @@ Operands are evaluated left to right, except when `and` or `or` short-circuits.
 - A top-level script prints a complete default document to stdout, like any other
   element. To attach JavaScript to a rendered page, nest the script inside the
   element passed to `render`.
+- A script is also a component value: `let helper = script() { "..." }` stores its
+  raw JavaScript body. Using `helper` as a child emits `<script>...</script>`;
+  `render(helper)` renders it as the document body. The raw body is retained so
+  event handlers can use it later.
 - Script bodies may contain `let`, assignment, `print`, `if`, and `while`, but
-  nested elements are a parse error (exit 65). `print()` still writes to the terminal,
-  never into the generated JavaScript.
+  nested elements are a parse error (exit 65). Using a component value as a
+  direct script expression is a runtime error because it would insert HTML into
+  JavaScript. `print()` still writes to the terminal, never into the generated
+  JavaScript.
 - As in other element bodies, only direct expression children contribute output;
   bare expressions inside `if`/`while` bodies are evaluated and discarded. To build
   conditional or repeated JavaScript, accumulate it in a string variable and expose
@@ -384,6 +470,7 @@ session or erase earlier global bindings.
 - Lookup is lexical (static scope): environment links follow enclosing source bodies, rather than active callers. Search starts in the innermost scope and the first matching binding wins. Function calls and closures are not implemented yet; blocks alone cannot demonstrate lexical versus dynamic function scope.
 - Errors in a body: each body restores its enclosing environment while the error propagates, so the REPL returns to its global scope. Earlier assignments to surviving outer bindings remain in effect.
 - Visibility: a binding becomes visible after its `let` executes, for the remaining statements of that scope and nested bodies. There is no hoisting. Element attributes run before entering the element body and therefore cannot use declarations from that body.
+- Component bindings: `let card = div() { ... }` evaluates the element immediately. Its body is its own scope; local declarations disappear when the body ends, while the generated HTML is stored in the binding. Reusing the binding does not re-run the body, so it captures the values that existed when it was bound.
 - Types: dynamic. A variable has no fixed type; assignment may give it a value of any type (`let x = 5` then `x = "hi"` is allowed).
 - Assignment: `name = expression` on its own line, a statement, not an expression. It evaluates the value, then updates the nearest scope (innermost outward) that already has `name`; an assignment inside an element body can update an outer binding. It never creates a binding, and it prints nothing.
 - Assignment errors: an unknown name is a runtime error (exit 70): `Undefined variable 'name'.` A target that isn't a plain name (`(1 + 2) = 3`) is a parse error (exit 65): `Invalid assignment target.` Chained assignment (`a = b = 3`) and assignment used as a value (`let y = (x = 5)`) are parse errors (exit 65).
@@ -400,7 +487,7 @@ storage exists. These are separate from the time a name acquires a value or type
 | Event | Binding and storage behavior |
 |---|---|
 | File/REPL starts | A global environment is created once for that run or session. |
-| `let` executes successfully | A named storage slot is inserted into the current environment after evaluating the initializer. With an initializer, its value and runtime type are established now. |
+| `let` executes successfully | A named storage slot is inserted into the current environment after evaluating the initializer. With an initializer, its value and runtime type are established now. A component initializer is rendered now; the binding stores the finished HTML fragment. |
 | `let name` executes | Storage exists, but no value or type is assigned yet. This differs from explicitly storing `null`. |
 | Assignment executes | The nearest existing slot gets the new value and its runtime type; storage is reused and the type may change. |
 | Element or control-flow body starts | A new scope is pushed onto the environment stack; declarations create slots as they execute. Each loop iteration has a fresh scope. |
@@ -419,6 +506,8 @@ The scope tests provide concrete traces:
 | Rule | Evidence |
 |---|---|
 | Create/read initialized bindings | `tests/lab4/bindings/declare_and_read.fmyr` |
+| Bind a component once, reuse its HTML | `tests/lab5/components/bind_button.fmyr`, `tests/lab5/components/reuse.fmyr` |
+| Component snapshot ignores later assignments | `tests/lab5/components/snapshot.fmyr` |
 | No read before declaration | `tests/lab4/bindings/read_before_declaration.fmyr` |
 | Explicit null is initialized | `tests/lab4/bindings/null_is_initialized.fmyr` |
 | Uninitialized read versus assignment | `tests/lab4/bindings/uninitialized_read.fmyr`, `tests/lab4/assignment/assign_uninitialized.fmyr` |
@@ -484,7 +573,7 @@ tracked in issue #74.
 | tests/lab2 | Parser | sidecar | `--parse` |
 | tests/lab3 | Evaluator | inline | `--eval` |
 | tests/lab4 | Context | inline | none |
-| tests/lab5 | Control flow, render options, and script elements | inline | none |
+| tests/lab5 | Control flow, render options, script elements, and component values | inline | none |
 
 
 Parser recovery cases run through the same annotated file harness in
@@ -569,6 +658,26 @@ render(div() {
 This writes `examples/interactive.html` with `<html lang="en">`, a `<title>`,
 and an inline click handler for the button.
 
+Run [examples/components.fmyr](examples/components.fmyr) to see components bound
+to variables and reused:
+
+```text
+let heading = text() { "Components as values" }
+
+let card = div() {
+  heading
+  par() { "The card is bound once and passed to render." }
+}
+
+render(card, title = "Component values")
+```
+
+This writes `examples/components.html`:
+
+```html
+<!DOCTYPE html><html lang="html"><head><title>Component values</title></head><body><div><h1>Components as values</h1><p>The card is bound once and passed to render.</p></div></body></html>
+```
+
 ## Design rationale
 
 Element bodies provide the DSL's nested binding forms. `let` creates a local
@@ -578,6 +687,12 @@ initializers use a separate uninitialized state to catch reads before assignment
 The same environment and executor serve files, element bodies, control flow, and
 the REPL; the entry point only selects whether bare values are displayed.
 
+Element literals are expressions that render eagerly to component values. This
+keeps `Value` owned (no borrowed ASTs or source lifetimes), makes reuse a simple
+HTML fragment insertion, and matches the imperative rule that a `let` initializer
+is evaluated when the `let` runs. Lazy templates, component props, and closures
+would each need a larger evaluation model, so they remain future work.
+
 ## Known limitations
 
 - REPL submissions must be complete on one line (#74).
@@ -586,9 +701,19 @@ the REPL; the entry point only selects whether bare values are displayed.
 - Only `color` affects element styling; the other parsed attributes are ignored.
 - `box` and `image` currently emit only their contents. Additional components,
   functions, closures, and events remain planned features.
+- Component values are eager HTML snapshots, not lazy templates. Reusing one does
+  not re-run its body or update it after outer bindings change. There are no
+  component props or closures yet.
+- A bare component expression at top level is still a bare expression: plain file
+  execution computes and discards it. Use the component inside an element body or
+  pass it to `render`.
 - `render` is top-level only, limited to one call per file, and unavailable in
-  the REPL. It overwrites an existing sibling `.html` file. Its document options
-  are limited to `title` and `lang`.
+  the REPL. Its first argument must evaluate to a component value. It overwrites
+  an existing sibling `.html` file. Its document options are limited to `title`
+  and `lang`.
+- Direct element statements are still rejected inside `if`/`while` and script
+  bodies; element expressions may be used there as values. Component values used
+  as script expressions are a runtime error.
 - `script` content is emitted raw; external scripts (`src`) and `</script>`
   escaping are not implemented. Its attributes are parsed but ignored.
 - Extremely deep expressions can overflow the host stack (#53).
@@ -603,3 +728,4 @@ the REPL; the entry point only selects whether bare values are displayed.
 | 1PR2 | expanded on keywords and allowed tokenizer to detect them |
 | Lab 4 | Mutable bindings, lexical body scopes, explicit printing, file execution, and scoped button colors. |
 | Lab 5 | `render(element, title = ..., lang = ...)` customizes the document wrapper and ends interpretation; `script() {}` embeds raw JavaScript. |
+| Components | Element literals are expressions; `let`/assignment can bind any component; component values are inserted raw as children; `render` accepts an element or component variable; script components retain raw JavaScript. |

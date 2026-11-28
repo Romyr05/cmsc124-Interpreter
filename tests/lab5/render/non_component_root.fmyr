@@ -1,0 +1,1 @@
+render(5)   # expect runtime error: render() expects an element or a component value.

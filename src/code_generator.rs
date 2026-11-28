@@ -35,11 +35,18 @@ fn append_children(
         for child in &element.children {
             match child {
                 TopLevel::Expr(expr) => {
-                    let value = stringify(&env.evaluate(expr)?);
-                    if escape_text {
-                        body.push_str(&escape_html(&value));
+                    let value = env.evaluate(expr)?;
+                    // Component values are generated markup, not user text:
+                    // insert them raw so a bound button/div keeps its tags.
+                    if value.is_markup() {
+                        body.push_str(&stringify(&value));
                     } else {
-                        body.push_str(&value);
+                        let text = stringify(&value);
+                        if escape_text {
+                            body.push_str(&escape_html(&text));
+                        } else {
+                            body.push_str(&text);
+                        }
                     }
                 }
                 TopLevel::Element(element) => append_element(element, body, env)?,
@@ -71,11 +78,19 @@ fn append_script_children(
         for child in &element.children {
             match child {
                 TopLevel::Expr(expr) => {
-                    let value = stringify(&env.evaluate(expr)?);
+                    let value = env.evaluate(expr)?;
+                    // A script body is JavaScript source, not an HTML parent:
+                    // inserting a component here would emit tags into JS.
+                    if value.is_markup() {
+                        return Err(RuntimeError::new(
+                            element.line,
+                            "Components are not allowed inside a script body.",
+                        ));
+                    }
                     if wrote_expression {
                         body.push('\n');
                     }
-                    body.push_str(&value);
+                    body.push_str(&stringify(&value));
                     wrote_expression = true;
                 }
                 // The parser rejects nested elements inside script bodies.
@@ -150,8 +165,47 @@ fn escape_html(text: &str) -> String {
         .replace('\'', "&#39;")
 }
 
+// Render only the element's own HTML, without the document wrapper. Component
+// values use this so they can be inserted into another element or render().
+pub fn generate_fragment(
+    element: &Element<'_>,
+    env: &mut Environment,
+) -> Result<String, RuntimeError> {
+    let mut body = String::new();
+    append_element(element, &mut body, env)?;
+    Ok(body)
+}
+
+// Render only a script element's body, without the <script> tags. Script
+// components keep this raw JavaScript so it can later become an event handler.
+pub fn generate_script_body(
+    element: &Element<'_>,
+    env: &mut Environment,
+) -> Result<String, RuntimeError> {
+    let mut body = String::new();
+    append_script_children(element, &mut body, env)?;
+    Ok(body)
+}
+
+// Wrap an already-generated body in the document boilerplate.
+pub fn wrap_document(body: &str, options: &DocumentOptions) -> String {
+    // Defaults produce exactly <head></head>; only an explicit title adds a tag.
+    let head = match &options.title {
+        Some(title) => format!("<title>{}</title>", escape_html(title)),
+        None => String::new(),
+    };
+
+    format!(
+        "<!DOCTYPE html><html lang=\"{}\"><head>{}</head><body>{}</body></html>",
+        escape_html(&options.lang),
+        head,
+        body
+    )
+}
+
 // Generate the HTML document for an element AST with the default boilerplate.
-// Top-level elements use this path; render() uses generate_document instead.
+// Top-level elements use this path; render() evaluates its root component and
+// reuses wrap_document instead.
 pub fn generate(element: &Element<'_>, env: &mut Environment) -> Result<String, RuntimeError> {
     generate_document(element, env, &DocumentOptions::default())
 }
@@ -163,19 +217,6 @@ pub fn generate_document(
     env: &mut Environment,
     options: &DocumentOptions,
 ) -> Result<String, RuntimeError> {
-    let mut body = String::new();
-    append_element(element, &mut body, env)?;
-
-    // Defaults produce exactly <head></head>; only an explicit title adds a tag.
-    let head = match &options.title {
-        Some(title) => format!("<title>{}</title>", escape_html(title)),
-        None => String::new(),
-    };
-
-    Ok(format!(
-        "<!DOCTYPE html><html lang=\"{}\"><head>{}</head><body>{}</body></html>",
-        escape_html(&options.lang),
-        head,
-        body
-    ))
+    let body = generate_fragment(element, env)?;
+    Ok(wrap_document(&body, options))
 }

@@ -1,0 +1,2 @@
+let s = script() { "console.log('hi')" }
+render(s, title = "Script")   # expect nothing

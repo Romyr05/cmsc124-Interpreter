@@ -9,6 +9,10 @@ pub fn print_expr(expr: &Expr<'_>) -> String {
             Value::Str(s) => s.clone(),
             Value::Bool(b) => b.to_string(),
             Value::Nil => "null".to_string(),
+            // Literals are built by the parser and never hold these values, but
+            // the match must stay exhaustive if that changes later.
+            Value::Component(html) => html.clone(),
+            Value::Script(js) => format!("<script>{}</script>", js),
         },
         Expr::Unary { operator, right } => parenthesize(operator.lexeme, &[right.as_ref()]),
         Expr::Binary {
@@ -18,6 +22,7 @@ pub fn print_expr(expr: &Expr<'_>) -> String {
         } => parenthesize(operator.lexeme, &[left.as_ref(), right.as_ref()]),
         Expr::Grouping { expression } => parenthesize("group", &[expression.as_ref()]),
         Expr::Variable { name, .. } => name.clone(),
+        Expr::Element { element } => print_element(element),
     }
 }
 
@@ -61,9 +66,9 @@ pub fn print_statement(item: &TopLevel<'_>) -> String {
         } => print_let(name, initializer.as_ref()),
         TopLevel::Print(e) => format!("(print {})", print_expr(e)),
         TopLevel::Render {
-            element, options, ..
+            component, options, ..
         } => {
-            let mut parts = vec!["render".to_string(), print_element(element)];
+            let mut parts = vec!["render".to_string(), print_expr(component)];
             for option in options {
                 parts.push(format!(
                     "({} {})",

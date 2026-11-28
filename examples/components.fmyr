@@ -1,0 +1,8 @@
+let heading = text() { "Components as values" }
+
+let card = div() {
+  heading
+  par() { "The card is bound once and passed to render." }
+}
+
+render(card, title = "Component values")

@@ -1,0 +1,2 @@
+let t = text() { "Title" }
+div() { t }   # expect: <!DOCTYPE html><html lang="html"><head></head><body><div><h1>Title</h1></div></body></html>

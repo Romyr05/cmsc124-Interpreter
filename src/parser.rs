@@ -27,7 +27,7 @@ pub struct Parser<'a> {
     seen_render: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 //This just basically means a statemetn
 pub enum TopLevel<'a> {
     Expr(Expr<'a>),
@@ -41,10 +41,12 @@ pub enum TopLevel<'a> {
     },
     // print(expression): writes the value to the terminal, never into HTML
     Print(Expr<'a>),
-    // render(element, options...): writes one complete HTML document to a
+    // render(component, options...): writes one complete HTML document to a
     // sibling .html file and ends interpretation. Only valid at top level.
+    // The root is an expression so both element literals and component
+    // variables can be rendered.
     Render {
-        element: Box<Element<'a>>,
+        component: Expr<'a>,
         options: Vec<RenderOption<'a>>,
         line: usize,
     },
@@ -338,6 +340,14 @@ impl<'a> Parser<'a> {
                 })
             }
 
+            // an element literal used as a value, e.g. let b = button() { "Hi" }
+            t if is_element_keyword(t) => {
+                let element = self.element()?;
+                Ok(Expr::Element {
+                    element: Box::new(element),
+                })
+            }
+
             TokenType::LeftParen => {
                 self.advance();
                 let inner = self.expression()?;
@@ -383,6 +393,7 @@ impl<'a> Parser<'a> {
             kind: kind.token_type,
             attributes,
             children,
+            line: kind.line,
         })
     }
 
@@ -528,6 +539,7 @@ impl<'a> Parser<'a> {
         Ok(Attribute {
             kind: kind.token_type,
             value,
+            line: kind.line,
         })
     }
 
@@ -650,8 +662,9 @@ impl<'a> Parser<'a> {
         Ok(TopLevel::Print(expr))
     }
 
-    // render ( element ( "," renderOption )* )   (the `render` was already consumed)
-    // The element is required: render() and render(expression) are errors.
+    // render ( expression ( "," renderOption )* )   (the `render` was already consumed)
+    // The root is required. It can be an element literal or a component variable;
+    // the value is checked at runtime to be a component.
     fn render_statement(&mut self) -> Result<TopLevel<'a>, ParseError<'a>> {
         let keyword = *self.previous();
         if self.seen_render {
@@ -663,23 +676,23 @@ impl<'a> Parser<'a> {
         self.seen_render = true;
 
         self.expect(TokenType::LeftParen, "Expected '(' after 'render'")?;
-        if !is_element_keyword(self.peek().token_type) {
+        if self.is_type(TokenType::RightParen) {
             return Err(ParseError {
                 token: *self.peek(),
                 message: "render() expects an element argument".to_string(),
             });
         }
-        let element = self.element()?;
+        let component = self.expression()?;
         let options = self.render_options()?;
         self.expect(TokenType::RightParen, "Expected ')' after render element")?;
         Ok(TopLevel::Render {
-            element: Box::new(element),
+            component,
             options,
             line: keyword.line,
         })
     }
 
-    // ( "," IDENTIFIER "=" expression )* after the render element.
+    // ( "," IDENTIFIER "=" expression )* after the render component.
     // title and lang stay ordinary identifiers everywhere outside this list.
     fn render_options(&mut self) -> Result<Vec<RenderOption<'a>>, ParseError<'a>> {
         let mut options: Vec<RenderOption<'a>> = Vec::new();
