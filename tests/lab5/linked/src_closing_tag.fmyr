@@ -1,0 +1,1 @@
+script(src = "assets/bad.js") { }   # expect runtime error: File 'assets/bad.js' contains '</script>', which cannot be inlined.

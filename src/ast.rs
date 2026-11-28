@@ -8,9 +8,9 @@ pub enum Value {
     Str(String), // owned, so Value needs no lifetime
     Bool(bool),
     Nil,
-    // A component literal rendered to an HTML fragment. It is trusted markup:
-    // when used as a child it is inserted raw instead of being HTML-escaped.
-    Component(String),
+    // A component literal rendered to markup. It is trusted: when used as a
+    // child its parts are inserted raw instead of being HTML-escaped.
+    Component(Markup),
     // A script component's raw JavaScript body. It renders as <script>...</script>
     // when used as a child, and can later be used directly as an event handler.
     Script(String),
@@ -21,6 +21,52 @@ impl Value {
     pub fn is_markup(&self) -> bool {
         matches!(self, Value::Component(_) | Value::Script(_))
     }
+
+    // The markup this value contributes when inserted into a page. A script
+    // value is JavaScript, so it goes to the end of <body> like every script.
+    pub fn as_markup(&self) -> Option<Markup> {
+        match self {
+            Value::Component(markup) => Some(markup.clone()),
+            Value::Script(javascript) => Some(Markup {
+                end: script_tag(javascript),
+                ..Markup::default()
+            }),
+            _ => None,
+        }
+    }
+}
+
+// Generated output split by where it belongs in the document. CSS is collected
+// into <head>, JavaScript into the end of <body>, and everything else stays in
+// source order in `body`. A component keeps all three, so a style or script
+// inside a bound component still lands in the right place when it is reused.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Markup {
+    pub head: String,
+    pub body: String,
+    pub end: String,
+}
+
+impl Markup {
+    // Add another fragment's parts after this one's, part by part.
+    pub fn append(&mut self, other: &Markup) {
+        self.head.push_str(&other.head);
+        self.body.push_str(&other.body);
+        self.end.push_str(&other.end);
+    }
+
+    // All parts as one string, in document order (print/--eval output).
+    pub fn to_html(&self) -> String {
+        format!("{}{}{}", self.head, self.body, self.end)
+    }
+}
+
+pub fn script_tag(javascript: &str) -> String {
+    format!("<script>{}</script>", javascript)
+}
+
+pub fn style_tag(css: &str) -> String {
+    format!("<style>{}</style>", css)
 }
 
 #[derive(Debug, Clone)]

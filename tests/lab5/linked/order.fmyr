@@ -1,0 +1,8 @@
+# styles keep source order in <head>; scripts keep source order after the body content
+div() {
+  script() { "first()" }
+  style() { "a {}" }
+  par() { "x" }
+  script(src = "assets/app.js") { }
+  style(src = "assets/page.css") { }
+}   # expect: <!DOCTYPE html><html lang="html"><head><style>a {}</style><style>h1 { color: blue; }</style></head><body><div><p>x</p></div><script>first()</script><script>console.log('linked')</script></body></html>

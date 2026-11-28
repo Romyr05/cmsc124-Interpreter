@@ -1,0 +1,6 @@
+# render puts collected CSS after the title in <head> and all JS at the end of <body>
+render(div() {
+  style(src = "../linked/assets/page.css") { }
+  text() { "Linked" }
+  script(src = "../linked/assets/app.js") { }
+}, title = "Assets", lang = "en")   # expect nothing

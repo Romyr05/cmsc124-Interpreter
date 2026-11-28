@@ -1,0 +1,2 @@
+let p = par() { "x" }
+style() { p }   # expect runtime error: Components are not allowed inside a style body.

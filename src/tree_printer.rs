@@ -11,8 +11,8 @@ pub fn print_expr(expr: &Expr<'_>) -> String {
             Value::Nil => "null".to_string(),
             // Literals are built by the parser and never hold these values, but
             // the match must stay exhaustive if that changes later.
-            Value::Component(html) => html.clone(),
-            Value::Script(js) => format!("<script>{}</script>", js),
+            Value::Component(markup) => markup.to_html(),
+            Value::Script(js) => crate::ast::script_tag(js),
         },
         Expr::Unary { operator, right } => parenthesize(operator.lexeme, &[right.as_ref()]),
         Expr::Binary {
